@@ -29,6 +29,7 @@ class RNN(nn.Module):
         bidrectional=False,
         epochs=10,
         lr=1e-5,
+        grained="fine",
     ):
         super(RNN, self).__init__()
         self.method = method
@@ -43,12 +44,15 @@ class RNN(nn.Module):
             dropout=0.5,
             bidirectional=bidrectional,
         )  # input_size 每个词的维度，hidden_size 神经元的个数
+        self.out_features = 20 if grained == "fine" else 2
         if bidrectional:
             self.linear = nn.Linear(
-                in_features=output_dim * 2, out_features=4, bias=True
+                in_features=output_dim * 2, out_features=self.out_features, bias=True
             )
         else:
-            self.linear = nn.Linear(in_features=output_dim, out_features=4, bias=True)
+            self.linear = nn.Linear(
+                in_features=output_dim, out_features=self.out_features, bias=True
+            )
         self.output = nn.Softmax()
         self.loss_fn = torch.nn.CrossEntropyLoss()
 

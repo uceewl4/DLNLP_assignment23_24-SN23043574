@@ -33,6 +33,7 @@ class Ensemble(nn.Module):
         epochs=10,
         lr=1e-5,
         alpha=0.5,
+        grained="fine",
     ):
         super(Ensemble, self).__init__()
         self.method = method
@@ -40,13 +41,16 @@ class Ensemble(nn.Module):
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
-        self.pretrained = Pretrained(method=method, device=device, lr=lr, epochs=epochs)
+        self.pretrained = Pretrained(
+            method=method, device=device, lr=lr, epochs=epochs, grained=grained
+        )
         self.rnn = RNN(
             method=method,
             device=device,
             input_dim=input_dim,
             output_dim=output_dim,
             bidrectional=bidirectional,
+            grained=grained,
         )
         self.lr = lr
         self.epochs = epochs

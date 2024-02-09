@@ -18,6 +18,9 @@ import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 import matplotlib.colors as mcolors
 from sklearn.decomposition import PCA
+from A.sentiment_analysis.Ensemble import Ensemble
+from A.sentiment_analysis.LSTM import LSTM
+from torchview import draw_graph
 from sklearn.metrics import (
     confusion_matrix,
     roc_curve,
@@ -41,7 +44,10 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from A.sentiment_analysis.Pretrained import Pretrained
+from A.sentiment_analysis.RNN import RNN
 
+import spacy
+from keras.utils import pad_sequences
 
 """
 description: This function is used for loading data from preprocessed dataset into model input.
@@ -53,41 +59,113 @@ return {*}: loaded model input
 """
 
 
-def load_data(batch_size=8, type="train"):
+def load_data(task, method, batch_size=8, type="train", grained="course"):
     # max length of each:
     # sentiment analysis: train 637  val: 593 test: 907
-    folder = "Datasets/preprocessed/sentiment_analysis"
-    # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    tokenizer = LongformerTokenizer.from_pretrained("allenai/longformer-base-4096")
+    folder = f"Datasets/preprocessed/{task}"
     df_all = pd.read_csv(os.path.join(folder, f"all.csv"))
-    label_map = {
-        i: index
-        for index, i in enumerate(sorted(list(set(df_all["sentiment"].to_list()))))
-    }
-    max_sentence_length = max(len(sentence) for sentence in df_all["tweet content"])
     df = pd.read_csv(os.path.join(folder, f"{type}.csv"))
-    input_ids = [
-        tokenizer.encode(
-            sentence,
-            add_special_tokens=True,
-            padding="max_length",
-            max_length=max_sentence_length,
+
+    if method in ["Pretrained", "RNN", "Ensemble"]:
+        # word
+        # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        tokenizer = LongformerTokenizer.from_pretrained("allenai/longformer-base-4096")
+        vocab = tokenizer.get_vocab()
+        max_sentence_length = max(len(sentence) for sentence in df_all.iloc[:, 1])
+        input_ids = [
+            tokenizer.encode(
+                sentence,
+                add_special_tokens=True,
+                padding="max_length",
+                max_length=max_sentence_length,
+            )
+            for sentence in df_all.iloc[:, 1]
+        ]
+        print(np.array(input_ids).shape)  # (44802,637)
+    elif method in ["LSTM"]:
+        spacy.cli.download("en_core_web_md")
+        nlp_md = spacy.load("en_core_web_md")
+        vocab = nlp_md.vocab
+        sentences = nlp_md.pipe(
+            df_all.iloc[:, 1], disable=["parser", "ner"], batch_size=100, n_process=3
         )
-        for sentence in df["tweet content"]
-    ]
-    print(np.array(input_ids).shape)  # (44802,637)
-    attention_masks = [[1] * len(input_id) for input_id in input_ids]
-    labels = df["sentiment"].map(lambda x: label_map[x]).to_list()
-    dataset = TensorDataset(  # 44802
-        torch.tensor(input_ids),
-        torch.tensor(attention_masks),
-        torch.tensor(labels),
-    )
+        max_sentence_length = max(len(sentence) for sentence in df_all.iloc[:, 1])
+        all_tokens = []
+        for sentence in sentences:
+            tokens = []
+            for token in sentence:
+                if token.is_alpha and not token.is_stop:
+                    tokens.append(token.lemma_.lower())
+            all_tokens.append(tokens)
+        vectors = nlp_md.vocab.vectors
+        input_ids = [
+            [vectors.find(key=word) for word in tokens if vectors.find(key=word) > -1]
+            for tokens in all_tokens
+        ]
+        input_ids = pad_sequences(
+            input_ids, maxlen=max_sentence_length, padding="post", truncating="post"
+        )
+        embeddings = nlp_md.vocab.vectors.data
+
+    # labels
+    label2numeric = {
+        i: index
+        for index, i in enumerate(sorted(list(set(df_all.iloc[:, 1].to_list()))))
+    }
+    numeric2label = {
+        index: i
+        for index, i in enumerate(sorted(list(set(df_all.iloc[:, 1].to_list()))))
+    }
+    labels = df.iloc[:, 1].map(lambda x: label2numeric[x]).to_list()  # course grain
+    if grained == "fine":
+        if task == "intent_recognition":
+            labels = [
+                (
+                    0
+                    if numeric2label[i]
+                    in [
+                        "Complain",
+                        "Praise",
+                        "Apologize",
+                        "Thank",
+                        "Criticize",
+                        "Care",
+                        "Agree",
+                        "Taunt",
+                        "Flaunt",
+                        "Oppose",
+                        "Joke",
+                    ]
+                    else 1
+                )
+                for i in labels
+            ]
+            # emotion, 0
+            # goal, 1
+        elif task == "fake_news":
+            labels = [0 if numeric2label[i] != "true" else 1 for i in labels]
+
+    if method == "Pretrained":
+        attention_masks = [[1] * len(input_id) for input_id in input_ids]
+        dataset = TensorDataset(  # 44802
+            torch.tensor(input_ids),
+            torch.tensor(attention_masks),
+            torch.tensor(labels),
+        )
+    elif method == "RNN":
+        dataset = TensorDataset(torch.tensor(input_ids), torch.tensor(labels))  # 44802
     dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size)
     print(next(iter(dataloader)))
-    return dataloader
+
+    if method == "Pretrained":
+        return dataloader
+    elif method in ["RNN", "Ensemble"]:
+        return dataloader, vocab
+    elif method == "LSTM":
+        return dataloader, vocab, embeddings
 
 
+# load_data("train")
 """
 description: This function is used for loading selected model.
 param {*} task: task A or B
@@ -98,9 +176,56 @@ return {*}: constructed model
 """
 
 
-def load_model(device, method, lr=0.001, epochs=10):
+def load_model(
+    device,
+    method,
+    embeddings=None,
+    vocab=None,
+    output_dim=64,
+    bidirectional=False,
+    lr=0.001,
+    epochs=10,
+    alpha=0.5,
+    grained="fine",
+):
     if method == "Pretrained":
-        model = Pretrained(device, device, lr=lr, epochs=epochs)
+        model = Pretrained(
+            method=method, device=device, lr=lr, epochs=epochs, grained=grained
+        )
+    elif method == "RNN":
+        model = RNN(
+            method=method,
+            device=device,
+            input_dim=len(vocab),
+            output_dim=output_dim,
+            bidrectional=bidirectional,
+            epochs=10,
+            lr=1e-5,
+            grained=grained,
+        )
+    elif method == "LSTM":
+        model = LSTM(
+            method,
+            device,
+            embeddings,
+            output_dim,
+            bidrectional=False,
+            epochs=10,
+            lr=1e-5,
+            grained=grained,
+        )
+    elif method == "Ensemble":
+        model = Ensemble(
+            method=method,
+            device=device,
+            input_dim=len(vocab),
+            output_dim=output_dim,
+            bidrectional=bidirectional,
+            epochs=10,
+            lr=1e-5,
+            alpha=alpha,
+            grained=grained,
+        )
     # elif method == "MoE":
     #     model = MoE(method, lr=lr, batch_size=batch_size, epochs=epochs)
     # elif method in ["ResNet50", "InceptionV3", "MobileNetV2", "NASNetMobile", "VGG19"]:
@@ -163,9 +288,9 @@ def visual4cm(task, method, ytrain, yval, ytest, train_pred, val_pred, test_pred
     plt.subplots_adjust(wspace=0.40, hspace=0.1)
     fig.colorbar(disp.im_, ax=axes)
 
-    if not os.path.exists("outputs/image_classification/confusion_matrix/"):
-        os.makedirs("outputs/image_classification/confusion_matrix/")
-    fig.savefig(f"outputs/image_classification/confusion_matrix/{method}.png")
+    if not os.path.exists(f"Outputs/{task}/confusion_matrix/"):
+        os.makedirs(f"Outputs/{task}/confusion_matrix/")
+    fig.savefig(f"Outputs/{task}/confusion_matrix/{method}.png")
     plt.close()
 
 
@@ -241,9 +366,19 @@ def visual4label(task, data):
     plt.close()
 
 
-def visual4loss(method, type, loss, acc):
+def visual4model(task, method, model, input_data):
+    model_graph = draw_graph(model, input_data=input_data)
+    plt.figure(figsize=(8, 15))
+    model_graph.visual_graph
+    if not os.path.exists(f"Outputs/{task}/models/"):
+        os.makedirs(f"Outputs/{task}/models/")
+    plt.savefig(f"Outputs/{task}/models/{method}.png")
+
+
+def visual4loss(task, method, type, loss, acc):
+    name = "epochs" if type == "train" else "steps"
     plt.figure()
-    plt.title(f"Loss for epochs of {method}")
+    plt.title(f"Loss for {name} of {method}")
     plt.plot(
         range(len(loss)),
         loss,
@@ -255,22 +390,45 @@ def visual4loss(method, type, loss, acc):
     )
     plt.tight_layout()
 
-    if not os.path.exists("outputs/image_classification/metric_lines"):
-        os.makedirs("outputs/image_classification/metric_lines")
-    plt.savefig(f"outputs/image_classification/metric_lines/{method}_{type}_loss.png")
+    if not os.path.exists(f"Outputs/{task}/metric_lines"):
+        os.makedirs(f"Outputs/{task}/metric_lines")
+    plt.savefig(f"Outputs/{task}/metric_lines/{method}_{type}_loss.png")
     plt.close()
 
-    plt.figure()
-    plt.title(f"Accuracy for epochs of {method}")
-    plt.plot(
-        range(len(acc)),
-        acc,
-        color="pink",
-        linestyle="dashed",
-        marker="o",
-        markerfacecolor="grey",
-        markersize=10,
-    )
-    plt.tight_layout()
-    plt.savefig(f"outputs/image_classification/metric_lines/{method}_{type}_acc.png")
-    plt.close()
+
+def visual4auc(task, method, ytrain, yval, ytest, pred_train, pred_val, pred_test):
+    """
+    This function is used for visualizing AUROC curve.
+    :param label_dict: predict labels of various methods
+    :param class_dict: true labels of various methods
+    :param name: name of output picture (name of the method)
+    """
+    dictionary = {
+        "train": (ytrain, pred_train),
+        "val": (yval, pred_val),
+        "test": (ytest, pred_test),
+    }
+    colors = list(mcolors.TABLEAU_COLORS.keys())
+    for index, (key, value) in enumerate(dictionary.items()):
+        fpr, tpr, thre = roc_curve(
+            value[0], value[1], pos_label=1, drop_intermediate=True
+        )
+        plt.plot(
+            fpr,
+            tpr,
+            lw=1,
+            label="{}(AUC={:.3f})".format(key, auc(fpr, tpr)),
+            color=mcolors.TABLEAU_COLORS[colors[index]],
+        )  # draw each one
+    plt.plot([0, 1], [0, 1], "--", lw=1, color="grey")
+    plt.axis("square")
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.xlabel("False Positive Rate", fontsize=10)
+    plt.ylabel("True Positive Rate", fontsize=10)
+    plt.title("ROC Curve", fontsize=10)
+    plt.legend(loc="lower right", fontsize=5)
+    if not os.path.exists(f"Outputs/{task}/metric_lines"):
+        os.makedirs(f"Outputs/{task}/metric_lines")
+    plt.savefig(f"Outputs/{task}/metric_lines/{method}_auroc.png")
+    plt.show()

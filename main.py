@@ -2,7 +2,15 @@ import os
 import argparse
 import warnings
 import torch
-from utils import get_metrics, load_model, visual4cm, visual4loss, load_data
+from utils import (
+    get_metrics,
+    load_model,
+    visual4auc,
+    visual4cm,
+    visual4loss,
+    load_data,
+    visual4model,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -34,7 +42,7 @@ if __name__ == "__main__":
     """
     # argument processing
     parser = argparse.ArgumentParser(description="Argparse")
-    parser.add_argument("--task", type=str, default="SA", help="")
+    parser.add_argument("--task", type=str, default="sentiment_analysis", help="")
     parser.add_argument("--method", type=str, default="Pretrained", help="model chosen")
     parser.add_argument(
         "--batch_size", type=int, default=64, help="batch size of NNs like MLP and CNN"
@@ -61,6 +69,18 @@ if __name__ == "__main__":
         default=False,
         help="whether consider multilabel setting for task B",
     )
+    parser.add_argument(
+        "--bidirectional",
+        type=bool,
+        default=False,
+        help="whether consider multilabel setting for task B",
+    )
+    parser.add_argument(
+        "--output_dims",
+        type=int,
+        default=64,
+        help="whether consider multilabel setting for task B",
+    )
     args = parser.parse_args()
     task = args.task
     method = args.method
@@ -80,11 +100,27 @@ if __name__ == "__main__":
     #     "datasets/pencil/" if method in ["PencilGAN"] else "datasets/preprocessed/"
     # )
 
-    if task == "SA":
-        train_dataloader = load_data(type="train", batch_size=args.batch_size)
-        val_dataloader = load_data(type="val", batch_size=args.batch_size)
-        test_dataloader = load_data(type="test", batch_size=args.batch_size)
-
+    if task == "sentiment_analysis":
+        if method == "Pretrained":
+            train_dataloader = load_data(type="train", batch_size=args.batch_size)
+            val_dataloader = load_data(type="val", batch_size=args.batch_size)
+            test_dataloader = load_data(type="test", batch_size=args.batch_size)
+        elif method in ["RNN", "Ensemble"]:
+            train_dataloader, vocab = load_data(
+                type="train", batch_size=args.batch_size
+            )
+            val_dataloader, vocab = load_data(type="val", batch_size=args.batch_size)
+            test_dataloader, vocab = load_data(type="test", batch_size=args.batch_size)
+        elif method in ["LSTM"]:
+            train_dataloader, vocab, embeddings = load_data(
+                type="train", batch_size=args.batch_size
+            )
+            val_dataloader, vpcab, embeddings = load_data(
+                type="val", batch_size=args.batch_size
+            )
+            test_dataloader, vocab, embeddings = load_data(
+                type="test", batch_size=args.batch_size
+            )
     print("Load data successfully.")
 
     # model selection
@@ -92,6 +128,38 @@ if __name__ == "__main__":
     print("Start loading model......")
     if method == "Pretrained":
         model = load_model(device, method, lr=args.lr, epochs=args.epochs)
+    elif method in ["RNN"]:
+        model = load_model(
+            device,
+            method,
+            vocab=vocab,
+            output_dim=args.output_dim,
+            bidirectional=args.bidirectional,
+            lr=args.lr,
+            epochs=args.epochs,
+        )
+    elif method == "LSTM":
+        model = load_model(
+            device,
+            method,
+            embeddings=embeddings,
+            vocab=vocab,
+            output_dim=args.output_dim,
+            bidirectional=args.bidirectional,
+            lr=args.lr,
+            epochs=args.epochs,
+        )
+    elif method in ["RNN"]:
+        model = load_model(
+            device,
+            method,
+            vocab=vocab,
+            output_dim=args.output_dim,
+            bidirectional=args.bidirectional,
+            lr=args.lr,
+            epochs=args.epochs,
+            alpha=args.alpha,
+        )
     print("Load model successfully.")
 
     """
@@ -99,11 +167,16 @@ if __name__ == "__main__":
         Detailed process of each method can be seen in corresponding classes.
     """
 
-    if method in ["Pretrained"]:
+    if method in ["Pretrained", "Ensemble"]:
         train_loss, val_loss, pred_train, pred_val, ytrain, yval = model.train(
             train_dataloader, val_dataloader
         )
         pred_test, ytest = model.test(test_dataloader)
+    elif method in ["RNN", "LSTM"]:
+        train_loss, val_loss, pred_train, pred_val, ytrain, yval = model.train(
+            model, train_dataloader, val_dataloader
+        )
+        pred_test, ytest = model.test(model, test_dataloader)
     # elif method in ["MoE", "Mulitmodal"]:
     #     pred_train, pred_val, ytrain, yval = model.train(
     #         train_dataset, val_dataset, test_dataset
@@ -142,7 +215,7 @@ if __name__ == "__main__":
 
     # metrics and visualization
     # confusion matrix, auc roc curve, metrics calculation
-    if task == "SA":
+    if task == "sentiment_analysis":
         res = {
             "train_res": get_metrics(task, ytrain, pred_train),
             "val_res": get_metrics(task, yval, pred_val),
@@ -153,8 +226,15 @@ if __name__ == "__main__":
         # if args.multilabel == True:
         #     method = method + "_multilabel"
         visual4cm(task, method, ytrain, yval, ytest, pred_train, pred_val, pred_test)
-        # if method != "MoE" and ("CNN" not in method):
-        #     visual4loss(
-        #         method, "train", train_res["train_loss"], train_res["train_acc"]
-        #     )
-        #     visual4loss(method, "val", val_res["val_loss"], val_res["val_acc"])
+
+    if method in ["RNN", "LSTM"]:
+        input_data = torch.randint(
+            len(vocab), (args.batch_size, iter(train_dataloader)[0].shape[1])
+        )  # size (64,104)
+        visual4model(model, input_data=input_data)
+
+    visual4loss(task, method, "train", train_loss)
+    visual4loss(task, method, "val", val_loss)
+
+    if task == "":
+        visual4auc(task, method, ytrain, yval, ytest, pred_train, pred_val, pred_test)

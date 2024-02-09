@@ -45,10 +45,10 @@ class RNN(nn.Module):
         )  # input_size 每个词的维度，hidden_size 神经元的个数
         if bidrectional:
             self.linear = nn.Linear(
-                in_features=output_dim * 2, out_features=4, bias=True
+                in_features=output_dim * 2, out_features=2, bias=True
             )
         else:
-            self.linear = nn.Linear(in_features=output_dim, out_features=4, bias=True)
+            self.linear = nn.Linear(in_features=output_dim, out_features=2, bias=True)
         self.output = nn.Softmax()
         self.loss_fn = torch.nn.CrossEntropyLoss()
 

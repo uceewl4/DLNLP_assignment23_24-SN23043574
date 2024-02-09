@@ -19,51 +19,31 @@ import numpy as np
 import torch
 
 
-class RNN(nn.Module):
-    def __init__(
-        self,
-        method,
-        device,
-        input_dim,
-        output_dim,
-        bidrectional=False,
-        epochs=10,
-        lr=1e-5,
-    ):
-        super(RNN, self).__init__()
+class Pretrained(nn.Module):
+    def __init__(self, method, device, epochs=10, lr=1e-5, grained="fine"):
+        super(Pretrained, self).__init__()
         self.method = method
         self.device = device
-
-        self.embedding = nn.Embedding(input_dim, output_dim)
-        self.rnn = nn.RNN(
-            input_size=output_dim,
-            hidden_size=output_dim,
-            num_layers=3,
-            batch_first=True,
-            dropout=0.5,
-            bidirectional=bidrectional,
-        )  # input_size 每个词的维度，hidden_size 神经元的个数
-        if bidrectional:
-            self.linear = nn.Linear(
-                in_features=output_dim * 2, out_features=4, bias=True
+        # self.model = AutoModelForSequenceClassification.from_pretrained(
+        #     "bert-base-uncased", num_labels=4
+        # )  # 4 class
+        if grained == "fine":
+            self.model = LongformerForSequenceClassification.from_pretrained(
+                "jpwahle/longformer-base-plagiarism-detection",
+                num_labels=20,
+                problem_type="multi_label_classification",
+                ignore_mismatched_sizes=True,
             )
         else:
-            self.linear = nn.Linear(in_features=output_dim, out_features=4, bias=True)
-        self.output = nn.Softmax()
-        self.loss_fn = torch.nn.CrossEntropyLoss()
-
+            self.model = LongformerForSequenceClassification.from_pretrained(
+                "jpwahle/longformer-base-plagiarism-detection"
+            )
+        self.model.to(device)
         self.lr = lr
         self.epochs = epochs
         self.optimizer = Adam(self.model.parameters(), lr=self.lr)
 
-    def forward(self, x):
-        x = self.embedding(x)
-        out, h_n = self.rnn(x)
-        x = self.linear(h_n)  # take the last hidden state
-        x = self.output(x)
-        return x
-
-    def train(self, model, train_dataloader, val_dataloader):
+    def train(self, train_dataloader, val_dataloader):
         print("Start training......")
         progress_bar = tqdm(range(self.epochs * len(train_dataloader)))
         train_epoch_losses = []
@@ -72,23 +52,29 @@ class RNN(nn.Module):
             train_losses, train_pred, train_labels = [], [], []
             for step, train_batch in enumerate(train_dataloader):
                 train_input_ids = train_batch[0].to(self.device)  # id tokens
-                train_label = train_batch[1].to(self.device)  # 64
+                train_attention_mask = train_batch[1].to(self.device)
+                train_label = train_batch[2].to(self.device)  # 64
 
                 self.optimizer.zero_grad()  # Zero the gradients
-                train_output = model(train_input_ids)
-                train_loss = self.loss_fn(train_output[0], train_label).item()
+                train_output = self.model(
+                    train_input_ids,
+                    attention_mask=train_attention_mask,
+                    labels=train_label,
+                )
+                train_loss = train_output.loss
                 train_loss.backward()  # Compute the gradient of the loss
                 self.optimizer.step()  # Update model parameters
                 progress_bar.update(1)
-                train_losses.append(train_loss)
+                train_losses.append(train_loss.cpu().detach())
 
+                train_logits = train_output.logits
                 train_pred.append(
-                    torch.argmax(train_output[0], dim=-1)
+                    torch.argmax(train_logits, dim=-1)
                 )  # from logits argmax
                 train_labels.append(train_label)
 
                 if step % 10 == 0:  # last time result
-                    model.eval()
+                    self.model.eval()
                     # self.model.to(device)
 
                     val_step_losses, val_pred, val_labels = [], [], []
@@ -98,13 +84,19 @@ class RNN(nn.Module):
                             val_losses = []
                             # Move batch data to the same device as the model
                             val_input_ids = val_batch[0].to(self.device)  # id tokens
-                            val_label = val_batch[1].to(self.device)
+                            val_attention_mask = val_batch[1].to(self.device)
+                            val_label = val_batch[2].to(self.device)
 
-                            val_output = model(val_input_ids)
-                            val_loss = self.loss_fn(val_output[0], val_label).item()
+                            val_output = self.model(
+                                val_input_ids,
+                                attention_mask=val_attention_mask,
+                                labels=val_label,
+                            )
+                            val_loss = val_output.loss
+                            val_logits = val_output.logits
 
                             val_pred.append(
-                                torch.argmax(val_output[0], dim=-1)
+                                torch.argmax(val_logits, dim=-1)
                             )  # from logits argmax
                             val_labels.append(val_label)
                             val_losses.append(val_loss)
@@ -128,9 +120,9 @@ class RNN(nn.Module):
                 val_labels,
             )
 
-    def test(self, model, test_dataloader):
+    def test(self, test_dataloader):
         print("Start testing......")
-        model.eval()
+        self.model.eval()
         # self.model.to(device)
         test_losses, test_pred, test_labels = [], [], []
 
@@ -138,14 +130,19 @@ class RNN(nn.Module):
             for test_batch in test_dataloader:
                 # Move batch data to the same device as the model
                 test_input_ids = test_batch[0].to(self.device)  # id tokens
-                test_label = test_batch[1].to(self.device)
+                test_attention_mask = test_batch[1].to(self.device)
+                test_label = test_batch[2].to(self.device)
 
-                test_output = model(test_input_ids)
-                test_loss = self.loss_fn(test_output[0], test_label).item()
+                test_output = self.model(
+                    test_input_ids,
+                    attention_mask=test_attention_mask,
+                    labels=test_label,
+                )
+                test_loss = test_output.loss
                 test_logits = test_output.logits
 
                 test_pred.append(
-                    torch.argmax(test_output[0], dim=-1)
+                    torch.argmax(test_logits, dim=-1)
                 )  # from logits argmax
                 test_labels.append(test_label)
                 test_losses.append(test_loss)

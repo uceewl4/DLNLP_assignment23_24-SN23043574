@@ -19,36 +19,40 @@ import numpy as np
 import torch
 
 
-class RNN(nn.Module):
+class LSTM(nn.Module):
     def __init__(
         self,
         method,
         device,
-        input_dim,
+        embeddings,
         output_dim,
         bidrectional=False,
         epochs=10,
         lr=1e-5,
+        grained="fine",
     ):
-        super(RNN, self).__init__()
+        super(LSTM, self).__init__()
         self.method = method
         self.device = device
 
-        self.embedding = nn.Embedding(input_dim, output_dim)
-        self.rnn = nn.RNN(
-            input_size=output_dim,
+        self.embedding = torch.nn.Embedding.from_pretrained(torch.Tensor(embeddings))
+        self.lstm = nn.LSTM(
+            input_size=embeddings.shape[1],  # dimension of word
             hidden_size=output_dim,
             num_layers=3,
             batch_first=True,
             dropout=0.5,
             bidirectional=bidrectional,
         )  # input_size 每个词的维度，hidden_size 神经元的个数
+        self.out_features = 6 if grained == "fine" else 2
         if bidrectional:
             self.linear = nn.Linear(
-                in_features=output_dim * 2, out_features=4, bias=True
+                in_features=output_dim * 2, out_features=self.out_features, bias=True
             )
         else:
-            self.linear = nn.Linear(in_features=output_dim, out_features=4, bias=True)
+            self.linear = nn.Linear(
+                in_features=output_dim, out_features=self.out_features, bias=True
+            )
         self.output = nn.Softmax()
         self.loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -58,9 +62,9 @@ class RNN(nn.Module):
 
     def forward(self, x):
         x = self.embedding(x)
-        out, h_n = self.rnn(x)
+        out, (h_n, c_n) = self.lstm(x)
         x = self.linear(h_n)  # take the last hidden state
-        x = self.output(x)
+        x = self.output(x)  # logits
         return x
 
     def train(self, model, train_dataloader, val_dataloader):
@@ -76,7 +80,9 @@ class RNN(nn.Module):
 
                 self.optimizer.zero_grad()  # Zero the gradients
                 train_output = model(train_input_ids)
-                train_loss = self.loss_fn(train_output[0], train_label).item()
+                train_loss = self.loss_fn(
+                    train_output[0], train_label
+                ).item()  # not from logits
                 train_loss.backward()  # Compute the gradient of the loss
                 self.optimizer.step()  # Update model parameters
                 progress_bar.update(1)
@@ -142,7 +148,6 @@ class RNN(nn.Module):
 
                 test_output = model(test_input_ids)
                 test_loss = self.loss_fn(test_output[0], test_label).item()
-                test_logits = test_output.logits
 
                 test_pred.append(
                     torch.argmax(test_output[0], dim=-1)
