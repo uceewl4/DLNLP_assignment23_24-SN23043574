@@ -29,6 +29,7 @@ class RNN(nn.Module):
         bidrectional=False,
         epochs=10,
         lr=1e-5,
+        grained="fine" 
     ):
         super(RNN, self).__init__()
         self.method = method

@@ -18,8 +18,26 @@ import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 import matplotlib.colors as mcolors
 from sklearn.decomposition import PCA
-from A.sentiment_analysis.Ensemble import Ensemble
-from A.sentiment_analysis.LSTM import LSTM
+from A.sentiment_analysis.Ensemble import Ensemble as SA_Ensemble
+from A.sentiment_analysis.LSTM import LSTM as SA_LSTM
+from A.sentiment_analysis.Pretrained import Pretrained as SA_Pretrained
+from A.sentiment_analysis.RNN import RNN as SA_RNN
+from A.intent_recognition.Ensemble import Ensemble as IR_Ensemble
+from A.intent_recognition.LSTM import LSTM as IR_LSTM
+from A.intent_recognition.Pretrained import Pretrained as IR_Pretrained
+from A.intent_recognition.RNN import RNN as IR_RNN
+from A.emotion_classification.Ensemble import Ensemble as EC_Ensemble
+from A.emotion_classification.LSTM import LSTM as EC_LSTM
+from A.emotion_classification.Pretrained import Pretrained as EC_Pretrained
+from A.emotion_classification.RNN import RNN as EC_RNN
+from A.fake_news.Ensemble import Ensemble as FN_Ensemble
+from A.fake_news.LSTM import LSTM as FN_LSTM
+from A.fake_news.Pretrained import Pretrained as FN_Pretrained
+from A.fake_news.RNN import RNN as FN_RNN
+from A.spam_detection.Ensemble import Ensemble as SD_Ensemble
+from A.spam_detection.LSTM import LSTM as SD_LSTM
+from A.spam_detection.Pretrained import Pretrained as SD_Pretrained
+from A.spam_detection.RNN import RNN as SD_RNN
 from torchview import draw_graph
 from sklearn.metrics import (
     confusion_matrix,
@@ -43,8 +61,6 @@ from transformers import AutoTokenizer, DataCollatorWithPadding, LongformerToken
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from A.sentiment_analysis.Pretrained import Pretrained
-from A.sentiment_analysis.RNN import RNN
 
 import spacy
 from keras.utils import pad_sequences
@@ -79,7 +95,7 @@ def load_data(task, method, batch_size=8, type="train", grained="course"):
                 padding="max_length",
                 max_length=max_sentence_length,
             )
-            for sentence in df_all.iloc[:, 1]
+            for sentence in df.iloc[:, 1]
         ]
         print(np.array(input_ids).shape)  # (44802,637)
     elif method in ["LSTM"]:
@@ -110,14 +126,14 @@ def load_data(task, method, batch_size=8, type="train", grained="course"):
     # labels
     label2numeric = {
         i: index
-        for index, i in enumerate(sorted(list(set(df_all.iloc[:, 1].to_list()))))
+        for index, i in enumerate(sorted(list(set(df_all.iloc[:, 0].to_list()))))
     }
     numeric2label = {
         index: i
-        for index, i in enumerate(sorted(list(set(df_all.iloc[:, 1].to_list()))))
+        for index, i in enumerate(sorted(list(set(df_all.iloc[:, 0].to_list()))))
     }
-    labels = df.iloc[:, 1].map(lambda x: label2numeric[x]).to_list()  # course grain
-    if grained == "fine":
+    labels = df.iloc[:, 0].map(lambda x: label2numeric[x]).to_list()  # course grain
+    if grained == "coarse":
         if task == "intent_recognition":
             labels = [
                 (
@@ -154,7 +170,7 @@ def load_data(task, method, batch_size=8, type="train", grained="course"):
         )
     elif method == "RNN":
         dataset = TensorDataset(torch.tensor(input_ids), torch.tensor(labels))  # 44802
-    dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size)
+    dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size, num_workers=0)
     print(next(iter(dataloader)))
 
     if method == "Pretrained":
@@ -177,6 +193,7 @@ return {*}: constructed model
 
 
 def load_model(
+    task,
     device,
     method,
     embeddings=None,
@@ -187,63 +204,204 @@ def load_model(
     epochs=10,
     alpha=0.5,
     grained="fine",
-):
-    if method == "Pretrained":
-        model = Pretrained(
-            method=method, device=device, lr=lr, epochs=epochs, grained=grained
-        )
-    elif method == "RNN":
-        model = RNN(
-            method=method,
-            device=device,
-            input_dim=len(vocab),
-            output_dim=output_dim,
-            bidrectional=bidirectional,
-            epochs=10,
-            lr=1e-5,
-            grained=grained,
-        )
-    elif method == "LSTM":
-        model = LSTM(
-            method,
-            device,
-            embeddings,
-            output_dim,
-            bidrectional=False,
-            epochs=10,
-            lr=1e-5,
-            grained=grained,
-        )
-    elif method == "Ensemble":
-        model = Ensemble(
-            method=method,
-            device=device,
-            input_dim=len(vocab),
-            output_dim=output_dim,
-            bidrectional=bidirectional,
-            epochs=10,
-            lr=1e-5,
-            alpha=alpha,
-            grained=grained,
-        )
-    # elif method == "MoE":
-    #     model = MoE(method, lr=lr, batch_size=batch_size, epochs=epochs)
-    # elif method in ["ResNet50", "InceptionV3", "MobileNetV2", "NASNetMobile", "VGG19"]:
-    #     model = Pretrained(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "Multimodal":
-    #     model = Multimodal(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "BaseGAN":
-    #     model = BaseGAN(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "PencilGAN":
-    #     model = PencilGAN(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "ConGAN":
-    #     model = ConGAN(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "AdvCNN":
-    #     model = AdvCNN(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "ViT":
-    #     model = ViT(method, lr=lr, epochs=epochs, batch_size=batch_size)
-    # elif method == "AutoEncoder":
-    #     model = AutoEncoder(method, lr=lr, epochs=epochs, batch_size=batch_size)
+):  
+    if task == "sentiment_analysis":
+        if method == "Pretrained":
+            model = SA_Pretrained(
+                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+            )
+        elif method == "RNN":
+            model = SA_RNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "LSTM":
+            model = SA_LSTM(
+                method,
+                device,
+                embeddings,
+                output_dim,
+                bidrectional=False,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "Ensemble":
+            model = SA_Ensemble(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                alpha=alpha,
+                grained=grained,
+            )
+    elif task == "intent_recognition":
+        if method == "Pretrained":
+            model = IR_Pretrained(
+                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+            )
+        elif method == "RNN":
+            model = IR_RNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "LSTM":
+            model = IR_LSTM(
+                method,
+                device,
+                embeddings,
+                output_dim,
+                bidrectional=False,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "Ensemble":
+            model = IR_Ensemble(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                alpha=alpha,
+                grained=grained,
+            )
+    elif task == "emotion_classification":
+        if method == "Pretrained":
+            model = EC_Pretrained(
+                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+            )
+        elif method == "RNN":
+            model = EC_RNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "LSTM":
+            model = EC_LSTM(
+                method,
+                device,
+                embeddings,
+                output_dim,
+                bidrectional=False,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "Ensemble":
+            model = EC_Ensemble(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                alpha=alpha,
+                grained=grained,
+            )
+    elif task == "fake_news":
+        if method == "Pretrained":
+            model = FN_Pretrained(
+                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+            )
+        elif method == "RNN":
+            model = FN_RNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "LSTM":
+            model = FN_LSTM(
+                method,
+                device,
+                embeddings,
+                output_dim,
+                bidrectional=False,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "Ensemble":
+            model = FN_Ensemble(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                alpha=alpha,
+                grained=grained,
+            )
+    elif task == "spam_detection":
+        if method == "Pretrained":
+            model = SD_Pretrained(
+                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+            )
+        elif method == "RNN":
+            model = SD_RNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "LSTM":
+            model = SD_LSTM(
+                method,
+                device,
+                embeddings,
+                output_dim,
+                bidrectional=False,
+                epochs=10,
+                lr=1e-5,
+                grained=grained,
+            )
+        elif method == "Ensemble":
+            model = SD_Ensemble(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                bidrectional=bidirectional,
+                epochs=10,
+                lr=1e-5,
+                alpha=alpha,
+                grained=grained,
+            )
+    
+   
 
     return model
 
@@ -375,24 +533,56 @@ def visual4model(task, method, model, input_data):
     plt.savefig(f"Outputs/{task}/models/{method}.png")
 
 
-def visual4loss(task, method, type, loss, acc):
-    name = "epochs" if type == "train" else "steps"
+def visual4loss(task, method, train_loss, train_acc, val_loss, val_acc):
     plt.figure()
-    plt.title(f"Loss for {name} of {method}")
+    plt.title(f"Loss for epochs of {method}")
     plt.plot(
-        range(len(loss)),
-        loss,
+        range(len(train_loss)),
+        train_loss,
         color="pink",
         linestyle="dashed",
         marker="o",
         markerfacecolor="grey",
         markersize=10,
     )
+    plt.plot(
+        range(len(val_loss)),
+        val_loss,
+        color="yellow",
+        linestyle="dashed",
+        marker="*",
+        markerfacecolor="orange",
+        markersize=10,
+    )
     plt.tight_layout()
 
     if not os.path.exists(f"Outputs/{task}/metric_lines"):
         os.makedirs(f"Outputs/{task}/metric_lines")
-    plt.savefig(f"Outputs/{task}/metric_lines/{method}_{type}_loss.png")
+    plt.savefig(f"Outputs/{task}/metric_lines/{method}_loss.png")
+    plt.close()
+
+    plt.figure()
+    plt.title(f"Accuracy for epochs of {method}")
+    plt.plot(
+        range(len(train_acc)),
+        train_acc,
+        color="pink",
+        linestyle="dashed",
+        marker="o",
+        markerfacecolor="grey",
+        markersize=10,
+    )
+    plt.plot(
+        range(len(val_acc)),
+        val_acc,
+        color="blue",
+        linestyle="dashed",
+        marker="*",
+        markerfacecolor="orange",
+        markersize=10,
+    )
+    plt.tight_layout()
+    plt.savefig(f"Outputs/{task}/metric_lines/{method}_acc.png")
     plt.close()
 
 

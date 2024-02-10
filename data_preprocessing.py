@@ -8,7 +8,9 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 """
 
 import json
+from sklearn.utils import shuffle
 import pprint
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -36,7 +38,7 @@ def sentence_clean(sentence):
 
     return sentence
 
-
+# 1200, 400, 400
 def sentiment_preprocessing():
     df_1 = pd.read_csv(
         "Datasets/raw/sentiment_analysis/twitter_training.csv",
@@ -63,14 +65,36 @@ def sentiment_preprocessing():
         df["tweet content"].astype(str).apply(lambda x: sentence_clean(x))
     )
     df = df[df["tweet content"] != ""].dropna(subset=["tweet content"])
-    df_train, df_left = train_test_split(df, test_size=0.4, random_state=42)
-    df_train.index = [i for i in range(len(df_train))]
-    df_val, df_test = train_test_split(df_left, test_size=0.5, random_state=42)
-    df_val.index = [i for i in range(len(df_val))]
-    df_test.index = [i for i in range(len(df_test))]
+
+    # 1200/4 300,300,300,300
+    # 400/4 100 100 100 100 
+    train_index, val_index, test_index = [],[],[]
+    df_all = df.copy()
+    for i in list(set(df["sentiment"].to_list())):
+        index = list(df[df["sentiment"] == i].index)
+        drop_index = random.sample(index, 300)
+        train_index += drop_index
+        df = df.drop(drop_index,axis=0)  # delete the sample case
+
+        index = list(df[df["sentiment"] == i].index)
+        drop_index = random.sample(index, 100)
+        val_index += drop_index
+        df = df.drop(drop_index,axis=0)  # delete the sample case
+        
+        index = list(df[df["sentiment"] == i].index)
+        drop_index = random.sample(index, 100)
+        test_index += drop_index
+        df = df.drop(drop_index,axis=0)
+
+    all_index = train_index+val_index+test_index
+    df_train = shuffle(df_all.loc[train_index,:])
+    df_val = shuffle(df_all.loc[val_index,:])
+    df_test = shuffle(df_all.loc[test_index,:])
+    df_all = shuffle(df_all.loc[all_index,:])
+
     if not os.path.exists("Datasets/preprocessed/sentiment_analysis"):
         os.makedirs("Datasets/preprocessed/sentiment_analysis")
-    df.to_csv("Datasets/preprocessed/sentiment_analysis/all.csv", index=False)
+    df_all.to_csv("Datasets/preprocessed/sentiment_analysis/all.csv", index=False)
     df_train.to_csv("Datasets/preprocessed/sentiment_analysis/train.csv", index=False)
     df_val.to_csv("Datasets/preprocessed/sentiment_analysis/val.csv", index=False)
     df_test.to_csv("Datasets/preprocessed/sentiment_analysis/test.csv", index=False)
@@ -100,13 +124,28 @@ def emotion_preprocessing():
         df["utterance"] = df["utterance"].astype(str).apply(lambda x: sentence_clean(x))
         df = df[df["utterance"] != ""].dropna(subset=["utterance"])
 
+        # 1200  150
+        # 400   50
+        df_tmp = df.copy()
+        tmp_index = []
+        for i in list(set(df["emotion"].to_list())):
+            type = list(df[df["emotion"] == i].index)
+            if "train" in file:
+                drop_index = random.sample(type, 150) 
+            else:
+                drop_index = type if len(type) <= 50 else random.sample(type, 50)
+            tmp_index += drop_index
+            df = df.drop(drop_index,axis=0)  # delete the sample case
+        df_tmp = df_tmp.loc[tmp_index,:]
+
         if index == 0:
-            df_all = df
+            df_all = df_tmp
         else:
-            df_all = pd.concat((df_all, df), ignore_index=True).dropna()
+            df_all = pd.concat((df_all, df_tmp), ignore_index=True).dropna()
+        df_tmp = shuffle(df_tmp)
         if not os.path.exists("Datasets/preprocessed/emotion_classification"):
             os.makedirs("Datasets/preprocessed/emotion_classification")
-        df.to_csv(
+        df_tmp.to_csv(
             f"Datasets/preprocessed/emotion_classification/{file.split('.')[0].split('_')[1]}.csv",
             index=False,
         )
@@ -114,6 +153,7 @@ def emotion_preprocessing():
     df_all["emotion"].value_counts().plot.bar(
         rot=0, figsize=(8, 5), grid=True, align="center"
     )
+    df_all = shuffle(df_all)
     fig.savefig("Outputs/data_visualization/emotion.png")
     df_all.to_csv("Datasets/preprocessed/emotion_classification/all.csv", index=False)
 
@@ -172,17 +212,35 @@ def spam_detection():
     )
     fig.savefig("Outputs/data_visualization/spam.png")
 
-    print(df)
-    df["text"] = df["text"].astype(str).apply(lambda x: sentence_clean(x))
-    df = df[df["text"] != ""].dropna(subset=["text"])
-    df_train, df_left = train_test_split(df, test_size=0.4, random_state=42)
-    df_train.index = [i for i in range(len(df_train))]
-    df_val, df_test = train_test_split(df_left, test_size=0.5, random_state=42)
-    df_val.index = [i for i in range(len(df_val))]
-    df_test.index = [i for i in range(len(df_test))]
+    # 1200/2 600,600
+    # 400/2 200 200
+    train_index, val_index, test_index = [],[],[]
+    df_all = df.copy()
+    for i in list(set(df["label"].to_list())):
+        index = list(df[df["label"] == i].index)
+        drop_index = random.sample(index, 500) if i == "spam" else random.sample(index, 600)
+        train_index += drop_index
+        df = df.drop(drop_index,axis=0)  # delete the sample case
+
+        index = list(df[df["label"] == i].index)
+        drop_index = index if len(index) < 200 else random.sample(index, 200)
+        val_index += drop_index
+        df = df.drop(drop_index,axis=0)  # delete the sample case
+        
+        index = list(df[df["label"] == i].index)
+        drop_index = index if len(index) < 200 else random.sample(index, 200)
+        test_index += drop_index
+        df = df.drop(drop_index,axis=0)
+
+    all_index = train_index+val_index+test_index
+    df_train = shuffle(df_all.loc[train_index,:])
+    df_val = shuffle(df_all.loc[val_index,:])
+    df_test = shuffle(df_all.loc[test_index,:])
+    df_all = shuffle(df_all.loc[all_index,:])
+
     if not os.path.exists("Datasets/preprocessed/spam_detection"):
         os.makedirs("Datasets/preprocessed/spam_detection")
-    df.to_csv("Datasets/preprocessed/spam_detection/all.csv", index=False)
+    df_all.to_csv("Datasets/preprocessed/spam_detection/all.csv", index=False)
     df_train.to_csv("Datasets/preprocessed/spam_detection/train.csv", index=False)
     df_val.to_csv("Datasets/preprocessed/spam_detection/val.csv", index=False)
     df_test.to_csv("Datasets/preprocessed/spam_detection/test.csv", index=False)
@@ -204,13 +262,28 @@ def fake_news():
         df["text"] = df["text"].astype(str).apply(lambda x: sentence_clean(x))
         df = df[df["text"] != ""].dropna(subset=["text"])
 
+        # 1200  200/200/
+        # 420   70
+        df_tmp = df.copy()
+        tmp_index = []
+        for i in list(set(df["label"].to_list())):
+            type = list(df[df["label"] == i].index)
+            if "train" in file:
+                drop_index = random.sample(type, 200) 
+            else:
+                drop_index = type if len(type) <= 70 else random.sample(type, 70)
+            tmp_index += drop_index
+            df = df.drop(drop_index,axis=0)  # delete the sample case
+        df_tmp = df_tmp.loc[tmp_index,:]
+
         if index == 0:
-            df_all = df
+            df_all = df_tmp
         else:
-            df_all = pd.concat((df_all, df), ignore_index=True).dropna()
+            df_all = pd.concat((df_all, df_tmp), ignore_index=True).dropna()
         if not os.path.exists("Datasets/preprocessed/fake_news"):
             os.makedirs("Datasets/preprocessed/fake_news")
-        df.to_csv(
+        df_tmp = shuffle(df_tmp)
+        df_tmp.to_csv(
             f"Datasets/preprocessed/fake_news/{file.split('.')[0]}.csv",
             index=False,
         )
@@ -219,7 +292,8 @@ def fake_news():
         rot=0, figsize=(20, 5), grid=True, align="center"
     )
     fig.savefig("Outputs/data_visualization/news.png")
+    df_all = shuffle(df_all)
     df_all.to_csv("Datasets/preprocessed/fake_news/all.csv", index=False)
 
 
-fake_news()
+# fake_news()

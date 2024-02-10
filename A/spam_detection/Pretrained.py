@@ -17,13 +17,26 @@ from torch.optim import Adam
 from tqdm.auto import tqdm
 import numpy as np
 import torch
+from sklearn.metrics import accuracy_score
+import torch.nn as nn
+from torch.nn import CrossEntropyLoss
+from transformers import (
+    AutoModelForSequenceClassification,
+    LongformerForSequenceClassification,
+)
+from torch.optim import Adam
+from tqdm.auto import tqdm
+import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 class Pretrained(nn.Module):
-    def __init__(self, method, device, epochs=10, lr=1e-5):
+    def __init__(self, method, device, epochs=10, lr=1e-5,grained="fine"):
         super(Pretrained, self).__init__()
         self.method = method
         self.device = device
+        self.num_class = 2
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
@@ -37,15 +50,15 @@ class Pretrained(nn.Module):
 
     def train(self, train_dataloader, val_dataloader):
         print("Start training......")
-        progress_bar = tqdm(range(self.epochs * len(train_dataloader)))
-        train_epoch_losses = []
+        train_epoch_losses, train_epoch_accs = [],[]
 
         for epoch in range(self.epochs):
+            progress_bar = tqdm(range(len(train_dataloader)))
             train_losses, train_pred, train_labels = [], [], []
             for step, train_batch in enumerate(train_dataloader):
                 train_input_ids = train_batch[0].to(self.device)  # id tokens
                 train_attention_mask = train_batch[1].to(self.device)
-                train_label = train_batch[2].to(self.device)  # 64
+                train_label = F.one_hot(train_batch[2],num_classes=self.num_class).type(torch.float).to(self.device)  # (8,20)
 
                 self.optimizer.zero_grad()  # Zero the gradients
                 train_output = self.model(
@@ -60,52 +73,61 @@ class Pretrained(nn.Module):
                 train_losses.append(train_loss.cpu().detach())
 
                 train_logits = train_output.logits
-                train_pred.append(
-                    torch.argmax(train_logits, dim=-1)
-                )  # from logits argmax
-                train_labels.append(train_label)
-
-                if step % 10 == 0:  # last time result
-                    self.model.eval()
-                    # self.model.to(device)
-
-                    val_step_losses, val_pred, val_labels = [], [], []
-
-                    with torch.no_grad():
-                        for val_batch in val_dataloader:
-                            val_losses = []
-                            # Move batch data to the same device as the model
-                            val_input_ids = val_batch[0].to(self.device)  # id tokens
-                            val_attention_mask = val_batch[1].to(self.device)
-                            val_label = val_batch[2].to(self.device)
-
-                            val_output = self.model(
-                                val_input_ids,
-                                attention_mask=val_attention_mask,
-                                labels=val_label,
-                            )
-                            val_loss = val_output.loss
-                            val_logits = val_output.logits
-
-                            val_pred.append(
-                                torch.argmax(val_logits, dim=-1)
-                            )  # from logits argmax
-                            val_labels.append(val_label)
-                            val_losses.append(val_loss)
-                        val_step_loss = torch.stack(
-                            val_losses
-                        ).mean()  # stack value together
-                        print(f"Step {step} complete, val loss: {val_step_loss}")
-                        val_step_losses.append(val_step_loss)
-
+                train_pred += torch.argmax(train_logits, dim=-1).tolist() # from logits argmax
+                train_labels += train_batch[2].tolist()
+            
+            train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
-            print(f"Epoch {epoch} complete, train loss: {train_epoch_losses}")
+            train_epoch_acc = round(
+            accuracy_score(np.array(train_labels).astype(int), train_pred.astype(int)) * 100, 4
+            )
+            print(f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}")
             train_epoch_losses.append(train_epoch_loss)
+            train_epoch_accs.append(train_epoch_acc)
+
+            self.model.eval()
+            # self.model.to(device)
+
+            val_epoch_losses,val_epoch_accs, val_pred, val_labels = [], [], [],[]
+            progress_bar_val = tqdm(range(len(val_dataloader)))
+
+            with torch.no_grad():
+                for val_batch in val_dataloader:
+                    val_losses = []
+                    # Move batch data to the same device as the model
+                    val_input_ids = val_batch[0].to(self.device)  # id tokens
+                    val_attention_mask = val_batch[1].to(self.device)
+                    val_label = F.one_hot(val_batch[2],num_classes=self.num_class).type(torch.float).to(self.device)
+
+                    val_output = self.model(
+                        val_input_ids,
+                        attention_mask=val_attention_mask,
+                        labels=val_label,
+                    )
+                    val_loss = val_output.loss
+                    val_logits = val_output.logits
+                    val_pred += torch.argmax(val_logits, dim=-1).tolist() # from logits argmax
+                    val_labels += val_batch[2].tolist()
+
+                    val_losses.append(val_loss)
+                    progress_bar_val.update(1)
+                
+                val_pred = np.array(val_pred)
+                val_epoch_acc = round(accuracy_score(np.array(val_labels).astype(int), val_pred.astype(int)) * 100, 4)
+                val_epoch_loss = torch.stack(
+                    val_losses
+                ).mean()  # stack value together
+                print(f"\nval loss: {val_epoch_loss}, acc: {val_epoch_acc}")
+                val_epoch_losses.append(val_epoch_loss.item())
+                val_epoch_accs.append(val_epoch_acc)
+
             print("Finish training.")
 
             return (
                 train_epoch_losses,
-                val_step_losses,
+                train_epoch_accs,
+                val_epoch_losses,
+                val_epoch_accs,
                 train_pred,
                 val_pred,
                 train_labels,
@@ -117,13 +139,14 @@ class Pretrained(nn.Module):
         self.model.eval()
         # self.model.to(device)
         test_losses, test_pred, test_labels = [], [], []
+        progress_bar_test = tqdm(range(len(test_dataloader)))
 
         with torch.no_grad():
             for test_batch in test_dataloader:
                 # Move batch data to the same device as the model
                 test_input_ids = test_batch[0].to(self.device)  # id tokens
                 test_attention_mask = test_batch[1].to(self.device)
-                test_label = test_batch[2].to(self.device)
+                test_label = F.one_hot(test_batch[2],num_classes=self.num_class).type(torch.float).to(self.device)
 
                 test_output = self.model(
                     test_input_ids,
@@ -132,12 +155,12 @@ class Pretrained(nn.Module):
                 )
                 test_loss = test_output.loss
                 test_logits = test_output.logits
+                progress_bar_test.update(1)
 
-                test_pred.append(
-                    torch.argmax(test_logits, dim=-1)
-                )  # from logits argmax
-                test_labels.append(test_label)
+                test_pred += torch.argmax(test_logits, dim=-1).tolist() # from logits argmax
+                test_labels += test_batch[2].tolist()
                 test_losses.append(test_loss)
-            print(f"Finish testing. Test loss: {torch.stack(test_losses).mean()}")
+            test_pred = np.array(test_pred)
+            print(f"\nFinish testing. Test loss: {torch.stack(test_losses).mean()}")
 
         return test_pred, test_labels

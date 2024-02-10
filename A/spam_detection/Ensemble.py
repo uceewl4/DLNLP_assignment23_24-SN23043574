@@ -33,6 +33,7 @@ class Ensemble(nn.Module):
         epochs=10,
         lr=1e-5,
         alpha=0.5,
+        grained="fine"
     ):
         super(Ensemble, self).__init__()
         self.method = method

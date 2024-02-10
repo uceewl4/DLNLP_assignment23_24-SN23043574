@@ -29,6 +29,7 @@ class LSTM(nn.Module):
         bidrectional=False,
         epochs=10,
         lr=1e-5,
+        grained="fine"
     ):
         super(LSTM, self).__init__()
         self.method = method
