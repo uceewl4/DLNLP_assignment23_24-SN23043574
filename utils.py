@@ -8,8 +8,25 @@
 @Contact :   uceewl4@ucl.ac.uk
 @Desc    :   This file is used for all utils function like visualization, data loading, model loading, etc.
 """
+import torch
+from torch import optim, nn
+from torch.utils.data import DataLoader, random_split
+import transformers
+from transformers import BertTokenizerFast, BertForQuestionAnswering
+from sklearn.metrics import f1_score
+from tqdm import tqdm
 
 # here put the import lib
+from datasets import load_dataset
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import torch
+from torch import optim
+from torch.nn import functional as F
+from transformers import AdamW, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import get_linear_schedule_with_warmup
+from tqdm import tqdm_notebook
 import os
 import json
 import random
@@ -64,6 +81,84 @@ from torch.utils.data import DataLoader, TensorDataset
 
 import spacy
 from keras.utils import pad_sequences
+from B.NER import NER
+
+from B.machine_translation import MT
+import torch
+from torch.utils.data import Dataset
+
+from B.question_answering import QA
+
+
+class SquadDataset(Dataset):
+    def __init__(self, data_path, tokenizer):
+        contexts, questions, answers = self.read_data(data_path)
+        answers = self.add_end_idx(contexts, answers)
+
+        encodings = tokenizer(contexts, questions, padding=True, truncation=True)
+        self.encodings = self.update_start_end_positions(encodings, answers, tokenizer)
+
+    def __getitem__(self, idx):
+        return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+
+    def __len__(self):
+        return len(self.encodings.input_ids)
+
+    def read_data(self, path):
+        with open(path, "rb") as f:
+            squad = json.load(f)
+
+        contexts = []
+        questions = []
+        answers = []
+        for group in squad["data"]:
+            for parag in group["paragraphs"]:
+                context = parag["context"]
+                for qa in parag["qas"]:
+                    question = qa["question"]
+                    for answer in qa["answers"]:
+                        contexts.append(context)
+                        questions.append(question)
+                        answers.append(answer)
+
+        return contexts, questions, answers
+
+    def add_end_idx(self, contexts, answers):
+        for answer, context in zip(answers, contexts):
+            gold_text = answer["text"]
+            start_idx = answer["answer_start"]
+
+            end_idx = start_idx + len(gold_text)
+
+            if context[start_idx:end_idx] == gold_text:
+                answer["answer_end"] = end_idx
+            elif context[start_idx - 1 : end_idx - 1] == gold_text:
+                answer["answer_start"] = start_idx - 1
+                answer["answer_end"] = end_idx - 1
+            elif context[start_idx - 2 : end_idx - 2] == gold_text:
+                answer["answer_start"] = start_idx - 2
+                answer["answer_end"] = end_idx - 2
+        return answers
+
+    def update_start_end_positions(self, encodings, answers, tokenizer):
+        start_positions = []
+        end_positions = []
+        for i in range(len(answers)):
+            start_positions.append(
+                encodings.char_to_token(i, answers[i]["answer_start"])
+            )
+            end_positions.append(
+                encodings.char_to_token(i, answers[i]["answer_end"] - 1)
+            )
+            if start_positions[-1] is None:
+                start_positions[-1] = tokenizer.model_max_length
+            if end_positions[-1] is None:
+                end_positions[-1] = tokenizer.model_max_length
+        encodings["start_positions"] = start_positions
+        encodings["end_positions"] = end_positions
+
+        return encodings
+
 
 """
 description: This function is used for loading data from preprocessed dataset into model input.
@@ -75,7 +170,7 @@ return {*}: loaded model input
 """
 
 
-def load_data(task, method, batch_size=8, type="train", grained="course"):
+def load_data(task, method, batch_size=8, type="train", grained="coarse"):
     # max length of each:
     # sentiment analysis: train 637  val: 593 test: 907
     folder = f"Datasets/preprocessed/{task}"
@@ -181,7 +276,324 @@ def load_data(task, method, batch_size=8, type="train", grained="course"):
         return dataloader, vocab, embeddings
 
 
+def load_data_MT(batch_size=8):
+    dataset = load_dataset("alt")
+    train_dataset = dataset["train"]
+    test_dataset = dataset["test"]
+    LANG_TOKEN_MAPPING = {"en": "<en>", "ja": "<jp>", "zh": "<zh>"}
+    tokenizer = AutoTokenizer.from_pretrained("google/mt5-base")
+    max_seq_len = 20
+    special_tokens_dict = {
+        "additional_special_tokens": list(LANG_TOKEN_MAPPING.values())
+    }
+    tokenizer.add_special_tokens(special_tokens_dict)
+    train_generator = get_data_generator(
+        train_dataset, LANG_TOKEN_MAPPING, tokenizer, max_seq_len, batch_size=batch_size
+    )
+    test_generator = get_data_generator(
+        test_dataset, LANG_TOKEN_MAPPING, tokenizer, batch_size
+    )
+    return (
+        train_generator,
+        test_generator,
+        tokenizer,
+        train_dataset,
+        test_dataset,
+        LANG_TOKEN_MAPPING,
+    )
+
+
+def encode_input_str(text, target_lang, tokenizer, seq_len, lang_token_map):
+    target_lang_token = lang_token_map[target_lang]
+
+    # Tokenize and add special tokens
+    input_ids = tokenizer.encode(
+        text=target_lang_token + text,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=seq_len,
+    )
+
+    return input_ids[0]
+
+
+def encode_target_str(text, tokenizer, seq_len, lang_token_map):
+    token_ids = tokenizer.encode(
+        text=text,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=seq_len,
+    )
+
+    return token_ids[0]
+
+
+def format_translation_data(translations, lang_token_map, tokenizer, seq_len=128):
+    # Choose a random 2 languages for in i/o
+    langs = list(lang_token_map.keys())
+    input_lang, target_lang = np.random.choice(langs, size=2, replace=False)
+
+    # Get the translations for the batch
+    input_text = translations[input_lang]
+    target_text = translations[target_lang]
+
+    if input_text is None or target_text is None:
+        return None
+
+    input_token_ids = encode_input_str(
+        input_text, target_lang, tokenizer, seq_len, lang_token_map
+    )
+
+    target_token_ids = encode_target_str(
+        target_text, tokenizer, seq_len, lang_token_map
+    )
+
+    return input_token_ids, target_token_ids
+
+
+def transform_batch(batch, lang_token_map, tokenizer, max_seq_len):
+    inputs = []
+    targets = []
+    for translation_set in batch["translation"]:
+        formatted_data = format_translation_data(
+            translation_set, lang_token_map, tokenizer, max_seq_len
+        )
+
+        if formatted_data is None:
+            continue
+
+        input_ids, target_ids = formatted_data
+        inputs.append(input_ids.unsqueeze(0))
+        targets.append(target_ids.unsqueeze(0))
+
+    batch_input_ids = torch.cat(inputs).cuda()
+    batch_target_ids = torch.cat(targets).cuda()
+
+    return batch_input_ids, batch_target_ids
+
+
+def get_data_generator(dataset, lang_token_map, tokenizer, max_seq_len, batch_size):
+    dataset = dataset.shuffle()
+    for i in range(0, len(dataset), batch_size):
+        raw_batch = dataset[i : i + batch_size]
+        yield transform_batch(raw_batch, lang_token_map, tokenizer, max_seq_len)
+
+
+def load_data_QA(batch_size=8):
+    tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+    dataset = SquadDataset("B/train-v2.0.json", tokenizer)
+    generator = torch.Generator().manual_seed(42)
+    train_dataset, val_dataset, test_dataset = random_split(
+        dataset, [0.8, 0.1, 0.1], generator=generator
+    )
+
+    train_dataloader = DataLoader(
+        dataset=train_dataset, batch_size=batch_size, shuffle=True
+    )
+    val_dataloader = DataLoader(
+        dataset=val_dataset, batch_size=batch_size, shuffle=True
+    )
+    test_dataloader = DataLoader(
+        dataset=test_dataset, batch_size=batch_size, shuffle=True
+    )
+    return train_dataloader, val_dataloader, test_dataloader
+
+
 # load_data("train")
+
+
+def load_data_NER():
+    data = pd.read_csv("B/ner_dataset.csv", encoding="unicode_escape")
+    token2idx, idx2token = get_dict_map(data, "token")
+    tag2idx, idx2tag = get_dict_map(data, "tag")
+    data_fillna = data.fillna(method="ffill", axis=0)
+    data_group = data_fillna.groupby(["Sentence #"], as_index=False)[
+        ["Word", "POS", "Tag", "Word_idx", "Tag_idx"]
+    ].agg(lambda x: list(x))
+    n_token = len(set(data["Word"]))  # 不同word的数量
+    n_tag = len(set(data["Tag"]))  # 不同tag的数量
+
+    # Pad tokens (X var)
+    tokens = data_group["Word_idx"].tolist()  # token ids of all sentences
+    maxlen = max([len(s) for s in tokens])  # 找到所有sentence中token数量最长的
+    # tokens =  data_group['Word_idx']
+    pad_tokens = pad_sequences_pytorch(
+        tokens, maxlen, n_token - 1
+    )  # sentence * max num tokens length
+    train_tokens, val_tokens, test_tokens, train_tags, val_tags, test_tags = (
+        get_pad_train_test_val(data_group, data, tag2idx)
+    )
+    input_dim = len(set(data["Word"])) + 1  # 单一词的维度
+    output_dim = 64
+    input_length = max([len(s) for s in data_group["Word_idx"]])
+    n_tags = len(tag2idx)
+    print(
+        "input_dim: ",
+        input_dim,
+        "\noutput_dim: ",
+        output_dim,
+        "\ninput_length: ",
+        input_length,
+        "\nn_tags: ",
+        n_tags,
+    )
+
+    n = 64  # batch_size
+    x_train = torch.tensor(
+        batch_split(np.array(train_tokens), n, "input"), dtype=torch.int32
+    )
+    y_train = torch.tensor(
+        batch_split(np.array(train_tags), n, "output"), dtype=torch.float32
+    )
+    x_valid = torch.tensor(
+        batch_split(np.array(val_tokens), n, "input"), dtype=torch.int32
+    )
+    y_valid = torch.tensor(  # [64,104,12], one-hot encoder
+        batch_split(np.array(val_tags), n, "output"), dtype=torch.float32
+    )
+    x_test = torch.tensor(
+        batch_split(np.array(test_tokens), n, "input"), dtype=torch.int32
+    )
+    y_test = torch.tensor(  # [64,104,12], one-hot encoder
+        batch_split(np.array(test_tags), n, "output"), dtype=torch.float32
+    )
+
+    return (
+        x_train,
+        y_train,
+        x_valid,
+        y_valid,
+        x_test,
+        y_test,
+        input_dim,
+        output_dim,
+        n_tags,
+    )
+
+
+def batch_split(x, n, input_length, role="token"):
+    # Number of rows in x
+    I = x.shape[0]
+
+    # if x.shape[-1]==input_length:
+    #     Q = 1
+    # else:
+    #     Q = x.shape[-1]
+
+    # Calculate batch_num
+    batch_num = I // n
+
+    # Truncate x to make it divisible by batch_size
+    x_truncated = x[: batch_num * n]
+
+    # Reshape x_truncated to [batch_num, 64, 104, ?]
+    if role == "input":  # batch_num, batch_size, input length
+        x_out = x_truncated.reshape(batch_num, n, input_length)
+    else:
+        x_out = x_truncated.reshape(batch_num, n, input_length, x.shape[-1])
+        print(x.shape[-1])
+    return x_out
+
+
+def get_pad_train_test_val(data_group, data, tag2idx):
+
+    # get max token and tag length
+    n_token = len(set(data["Word"]))  # remove duplication
+    n_tag = len(set(data["Tag"]))
+
+    # word和tag都进行padding
+
+    tokens = data_group["Word_idx"]
+    maxlen = max([len(s) for s in tokens])
+
+    pad_tokens = pad_sequences_pytorch(tokens, maxlen, n_token - 1)
+
+    tags = data_group["Tag_idx"]  # tag 全部用O padding
+    pad_tags = pad_sequences_pytorch(tags, maxlen, tag2idx["O"])
+    n_tags = len(tag2idx)
+    a = torch.tensor([7, 7])
+    pad_tags = [to_categorical(i, num_classes=n_tags) for i in pad_tags]
+
+    # Split train, test and validation set
+    tokens_, test_tokens, tags_, test_tags = train_test_split(
+        pad_tokens, pad_tags, test_size=0.1, train_size=0.1, random_state=2023
+    )
+    train_tokens, val_tokens, train_tags, val_tags = train_test_split(
+        tokens_, tags_, test_size=0.25, train_size=0.75, random_state=2023
+    )
+
+    print(
+        "train_tokens length:",
+        len(train_tokens),
+        "\ntrain_tokens length:",
+        len(train_tokens),
+        "\ntest_tokens length:",
+        len(test_tokens),
+        "\ntest_tags:",
+        len(test_tags),
+        "\nval_tokens:",
+        len(val_tokens),
+        "\nval_tags:",
+        len(val_tags),
+    )
+
+    return train_tokens, val_tokens, test_tokens, train_tags, val_tags, test_tags
+
+
+def get_dict_map(data, token_or_tag):
+    tok2idx = {}
+    idx2tok = {}
+
+    if token_or_tag == "token":
+        vocab = list(set(data["Word"].to_list()))
+    else:
+        vocab = list(set(data["Tag"].to_list()))
+
+    idx2tok = {
+        idx: tok for idx, tok in enumerate(vocab)
+    }  # token as index of vocabulary
+    tok2idx = {tok: idx for idx, tok in enumerate(vocab)}
+
+    return tok2idx, idx2tok
+
+
+def to_categorical(y, num_classes):
+    """re-write keras.utils.to_categorical in numpy version
+
+    1-hot encodes a tensor
+    """
+    return np.eye(num_classes, dtype="uint8")[y]
+
+
+def pad_sequences_pytorch(tokens, maxlen, pad_value):
+    """
+    Pad sequences to the same length with PyTorch.
+
+    Args:
+    tokens (list of lists): List of sequences to be padded.
+    maxlen (int): Desired length of each sequence.
+    pad_value (int): Value to use for padding.
+
+    Returns:
+    torch.Tensor: Padded sequences.
+    """
+    # Create an empty tensor with the specified padding value
+    padded_sequences = torch.full((len(tokens), maxlen), pad_value, dtype=torch.int32)
+    # size, filled values: sentence * maxlen, specified padding value: n_token-1
+    # 可以理解成剩下的都用最后一个token padding
+
+    # Iterate over the sequences and copy over the token values
+    for i, sequence in enumerate(tokens):
+        length = min(len(sequence), maxlen)
+        padded_sequences[i, :length] = torch.tensor(
+            sequence[:length], dtype=torch.int32
+        )
+
+    return padded_sequences
+
+
 """
 description: This function is used for loading selected model.
 param {*} task: task A or B
@@ -196,6 +608,8 @@ def load_model(
     task,
     device,
     method,
+    input_dim=None,
+    n_tags=None,
     embeddings=None,
     vocab=None,
     output_dim=64,
@@ -204,7 +618,9 @@ def load_model(
     epochs=10,
     alpha=0.5,
     grained="fine",
-):  
+    tokenizer=None,
+    batch_size=8,
+):
     if task == "sentiment_analysis":
         if method == "Pretrained":
             model = SA_Pretrained(
@@ -217,19 +633,19 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "LSTM":
             model = SA_LSTM(
-                method,
-                device,
-                embeddings,
-                output_dim,
+                method=method,
+                device=device,
+                embeddings=embeddings,
+                output_dim=output_dim,
                 bidrectional=False,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "Ensemble":
@@ -239,8 +655,8 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 alpha=alpha,
                 grained=grained,
             )
@@ -256,19 +672,19 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "LSTM":
             model = IR_LSTM(
-                method,
-                device,
-                embeddings,
-                output_dim,
+                method=method,
+                device=method,
+                embeddings=embeddings,
+                output_dim=output_dim,
                 bidrectional=False,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "Ensemble":
@@ -278,8 +694,8 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 alpha=alpha,
                 grained=grained,
             )
@@ -295,9 +711,8 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
-                grained=grained,
+                epochs=epochs,
+                lr=lr,
             )
         elif method == "LSTM":
             model = EC_LSTM(
@@ -306,9 +721,8 @@ def load_model(
                 embeddings,
                 output_dim,
                 bidrectional=False,
-                epochs=10,
-                lr=1e-5,
-                grained=grained,
+                epochs=epochs,
+                lr=lr,
             )
         elif method == "Ensemble":
             model = EC_Ensemble(
@@ -317,10 +731,9 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 alpha=alpha,
-                grained=grained,
             )
     elif task == "fake_news":
         if method == "Pretrained":
@@ -334,19 +747,19 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "LSTM":
             model = FN_LSTM(
-                method,
-                device,
-                embeddings,
-                output_dim,
+                method=method,
+                device=method,
+                embeddings=embeddings,
+                output_dim=output_dim,
                 bidrectional=False,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "Ensemble":
@@ -356,8 +769,8 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 alpha=alpha,
                 grained=grained,
             )
@@ -373,19 +786,19 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "LSTM":
             model = SD_LSTM(
-                method,
-                device,
-                embeddings,
-                output_dim,
+                method=method,
+                device=method,
+                embeddings=embeddings,
+                output_dim=output_dim,
                 bidrectional=False,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
         elif method == "Ensemble":
@@ -395,14 +808,27 @@ def load_model(
                 input_dim=len(vocab),
                 output_dim=output_dim,
                 bidrectional=bidirectional,
-                epochs=10,
-                lr=1e-5,
+                epochs=epochs,
+                lr=lr,
                 alpha=alpha,
                 grained=grained,
             )
-    
-   
-
+    elif task == "MT":
+        model = MT(
+            method, device, tokenizer, epochs=epochs, lr=lr, batch_size=batch_size
+        )
+    elif task == "QA":
+        model = QA(method, device, epochs=epochs, lr=lr, batch_size=batch_size)
+    elif task == "NER":
+        model = NER(
+            method=method,
+            device=device,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            n_tags=n_tags,
+            epochs=epochs,
+            lr=lr,
+        )
     return model
 
 
@@ -524,15 +950,6 @@ def visual4label(task, data):
     plt.close()
 
 
-def visual4model(task, method, model, input_data):
-    model_graph = draw_graph(model, input_data=input_data)
-    plt.figure(figsize=(8, 15))
-    model_graph.visual_graph
-    if not os.path.exists(f"Outputs/{task}/models/"):
-        os.makedirs(f"Outputs/{task}/models/")
-    plt.savefig(f"Outputs/{task}/models/{method}.png")
-
-
 def visual4loss(task, method, train_loss, train_acc, val_loss, val_acc):
     plt.figure()
     plt.title(f"Loss for epochs of {method}")
@@ -548,7 +965,7 @@ def visual4loss(task, method, train_loss, train_acc, val_loss, val_acc):
     plt.plot(
         range(len(val_loss)),
         val_loss,
-        color="yellow",
+        color="blue",
         linestyle="dashed",
         marker="*",
         markerfacecolor="orange",
@@ -622,3 +1039,15 @@ def visual4auc(task, method, ytrain, yval, ytest, pred_train, pred_val, pred_tes
         os.makedirs(f"Outputs/{task}/metric_lines")
     plt.savefig(f"Outputs/{task}/metric_lines/{method}_auroc.png")
     plt.show()
+
+
+def visual4MT(task, losses):
+    window_size = 50
+    smoothed_losses = []
+    for i in range(len(losses) - window_size):
+        smoothed_losses.append(np.mean(losses[i : i + window_size]))
+    plt.plot(smoothed_losses[100:])
+    if not os.path.exists(f"Outputs/{task}"):
+        os.makedirs(f"Outputs/{task}")
+    plt.savefig(f"Outputs/{task}/train_loss.png")
+    plt.close()

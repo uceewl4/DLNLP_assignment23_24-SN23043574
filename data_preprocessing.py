@@ -38,6 +38,7 @@ def sentence_clean(sentence):
 
     return sentence
 
+
 # 1200, 400, 400
 def sentiment_preprocessing():
     df_1 = pd.read_csv(
@@ -67,30 +68,30 @@ def sentiment_preprocessing():
     df = df[df["tweet content"] != ""].dropna(subset=["tweet content"])
 
     # 1200/4 300,300,300,300
-    # 400/4 100 100 100 100 
-    train_index, val_index, test_index = [],[],[]
+    # 400/4 100 100 100 100
+    train_index, val_index, test_index = [], [], []
     df_all = df.copy()
     for i in list(set(df["sentiment"].to_list())):
         index = list(df[df["sentiment"] == i].index)
         drop_index = random.sample(index, 300)
         train_index += drop_index
-        df = df.drop(drop_index,axis=0)  # delete the sample case
+        df = df.drop(drop_index, axis=0)  # delete the sample case
 
         index = list(df[df["sentiment"] == i].index)
         drop_index = random.sample(index, 100)
         val_index += drop_index
-        df = df.drop(drop_index,axis=0)  # delete the sample case
-        
+        df = df.drop(drop_index, axis=0)  # delete the sample case
+
         index = list(df[df["sentiment"] == i].index)
         drop_index = random.sample(index, 100)
         test_index += drop_index
-        df = df.drop(drop_index,axis=0)
+        df = df.drop(drop_index, axis=0)
 
-    all_index = train_index+val_index+test_index
-    df_train = shuffle(df_all.loc[train_index,:])
-    df_val = shuffle(df_all.loc[val_index,:])
-    df_test = shuffle(df_all.loc[test_index,:])
-    df_all = shuffle(df_all.loc[all_index,:])
+    all_index = train_index + val_index + test_index
+    df_train = shuffle(df_all.loc[train_index, :])
+    df_val = shuffle(df_all.loc[val_index, :])
+    df_test = shuffle(df_all.loc[test_index, :])
+    df_all = shuffle(df_all.loc[all_index, :])
 
     if not os.path.exists("Datasets/preprocessed/sentiment_analysis"):
         os.makedirs("Datasets/preprocessed/sentiment_analysis")
@@ -131,12 +132,12 @@ def emotion_preprocessing():
         for i in list(set(df["emotion"].to_list())):
             type = list(df[df["emotion"] == i].index)
             if "train" in file:
-                drop_index = random.sample(type, 150) 
+                drop_index = random.sample(type, 150)
             else:
                 drop_index = type if len(type) <= 50 else random.sample(type, 50)
             tmp_index += drop_index
-            df = df.drop(drop_index,axis=0)  # delete the sample case
-        df_tmp = df_tmp.loc[tmp_index,:]
+            df = df.drop(drop_index, axis=0)  # delete the sample case
+        df_tmp = df_tmp.loc[tmp_index, :]
 
         if index == 0:
             df_all = df_tmp
@@ -214,29 +215,31 @@ def spam_detection():
 
     # 1200/2 600,600
     # 400/2 200 200
-    train_index, val_index, test_index = [],[],[]
+    train_index, val_index, test_index = [], [], []
     df_all = df.copy()
     for i in list(set(df["label"].to_list())):
         index = list(df[df["label"] == i].index)
-        drop_index = random.sample(index, 500) if i == "spam" else random.sample(index, 600)
+        drop_index = (
+            random.sample(index, 500) if i == "spam" else random.sample(index, 600)
+        )
         train_index += drop_index
-        df = df.drop(drop_index,axis=0)  # delete the sample case
+        df = df.drop(drop_index, axis=0)  # delete the sample case
 
         index = list(df[df["label"] == i].index)
         drop_index = index if len(index) < 200 else random.sample(index, 200)
         val_index += drop_index
-        df = df.drop(drop_index,axis=0)  # delete the sample case
-        
+        df = df.drop(drop_index, axis=0)  # delete the sample case
+
         index = list(df[df["label"] == i].index)
         drop_index = index if len(index) < 200 else random.sample(index, 200)
         test_index += drop_index
-        df = df.drop(drop_index,axis=0)
+        df = df.drop(drop_index, axis=0)
 
-    all_index = train_index+val_index+test_index
-    df_train = shuffle(df_all.loc[train_index,:])
-    df_val = shuffle(df_all.loc[val_index,:])
-    df_test = shuffle(df_all.loc[test_index,:])
-    df_all = shuffle(df_all.loc[all_index,:])
+    all_index = train_index + val_index + test_index
+    df_train = shuffle(df_all.loc[train_index, :])
+    df_val = shuffle(df_all.loc[val_index, :])
+    df_test = shuffle(df_all.loc[test_index, :])
+    df_all = shuffle(df_all.loc[all_index, :])
 
     if not os.path.exists("Datasets/preprocessed/spam_detection"):
         os.makedirs("Datasets/preprocessed/spam_detection")
@@ -269,12 +272,12 @@ def fake_news():
         for i in list(set(df["label"].to_list())):
             type = list(df[df["label"] == i].index)
             if "train" in file:
-                drop_index = random.sample(type, 200) 
+                drop_index = random.sample(type, 200)
             else:
                 drop_index = type if len(type) <= 70 else random.sample(type, 70)
             tmp_index += drop_index
-            df = df.drop(drop_index,axis=0)  # delete the sample case
-        df_tmp = df_tmp.loc[tmp_index,:]
+            df = df.drop(drop_index, axis=0)  # delete the sample case
+        df_tmp = df_tmp.loc[tmp_index, :]
 
         if index == 0:
             df_all = df_tmp
@@ -296,4 +299,4 @@ def fake_news():
     df_all.to_csv("Datasets/preprocessed/fake_news/all.csv", index=False)
 
 
-# fake_news()
+fake_news()
