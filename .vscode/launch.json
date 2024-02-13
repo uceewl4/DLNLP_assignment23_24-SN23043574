@@ -5,7 +5,6 @@
     "version": "0.2.0",
     "configurations": [
 
-
         {
             "name": "Python 调试程序: 当前文件",
             "type": "debugpy",
@@ -13,7 +12,11 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["--method","RNN","--task","intent_recognition","--epochs","1","--grained","coarse"]
+            "args": [
+            "--task","emotion_classification",
+            "--epochs","1",
+            "--multilabel","True",
+            ]
         }
     ]
 }

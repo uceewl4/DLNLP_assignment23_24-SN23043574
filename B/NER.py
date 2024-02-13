@@ -73,8 +73,8 @@ class NER(nn.Module):
 
         self.linear = nn.Linear(output_dim, n_tags)  # 分类成12个tag  64--12
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(lr=lr, weight_decay=1e-4)
         self.epochs = epochs
+        self.lr = lr
         # Activation function
         self.relu = nn.ReLU()
 
@@ -88,9 +88,12 @@ class NER(nn.Module):
         return x_end
 
     def train(self, model, x_train, y_train, x_val, y_val):
+        self.optimizer = optim.Adam(
+            model.parameters(), lr=self.lr, weight_decay=1e-4
+        )  # 0.001
         print("Start training......")
         for epoch in range(self.epochs):
-            model.train()  # switch into training mode
+            # model.train()  # switch into training mode
             loss_total = 0  # calculate the average loss each time
 
             # Assuming 'data_loader' is your DataLoader for training data

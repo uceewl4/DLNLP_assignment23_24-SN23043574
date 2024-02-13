@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
     This is the part for CPU and GPU setting. Notice that part of the project 
     code is run on UCL server with provided GPU resources, especially for NNs 
     and pretrained models.
-"""
+# """
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 # # export CUDA_VISIBLE_DEVICES=1  # used for setting specific GPU in terminal
 # if tf.config.list_physical_devices("GPU"):
@@ -91,6 +91,12 @@ if __name__ == "__main__":
         default="fine",
         help="whether consider multilabel setting for task B",
     )
+    parser.add_argument(
+        "--alpha",
+        type=int,
+        default=0.5,
+        help="whether consider multilabel setting for task B",
+    )
     args = parser.parse_args()
     task = args.task
     method = args.method
@@ -139,7 +145,7 @@ if __name__ == "__main__":
                 batch_size=args.batch_size,
                 grained=args.grained,
             )
-        elif method in ["RNN", "Ensemble"]:
+        elif method in ["RNN", "Ensemble", "TextCNN"]:
             train_dataloader, vocab = load_data(
                 task,
                 method,
@@ -222,8 +228,15 @@ if __name__ == "__main__":
         "emotion_classification",
     ]:
         if method == "Pretrained":
-            model = load_model(task, device, method, lr=args.lr, epochs=args.epochs)
-        elif method in ["RNN"]:
+            model = load_model(
+                task,
+                device,
+                method,
+                lr=args.lr,
+                epochs=args.epochs,
+                multilabel=args.multilabel,
+            )
+        elif method in ["RNN", "TextCNN"]:
             model = load_model(
                 task,
                 device,
@@ -258,11 +271,11 @@ if __name__ == "__main__":
                 bidirectional=args.bidirectional,
                 lr=args.lr,
                 epochs=args.epochs,
-                alpha=args.alpha,
                 grained=args.grained,
             )
     elif task == "MT":
         model = load_model(
+            task,
             method=method,
             device=device,
             tokenizer=tokenizer,
@@ -272,6 +285,7 @@ if __name__ == "__main__":
         )
     elif task == "QA":
         model = load_model(
+            task,
             method=method,
             device=device,
             epochs=args.epochs,
@@ -280,12 +294,13 @@ if __name__ == "__main__":
         )
     elif task == "NER":
         model = load_model(
+            task,
             method=method,
             device=device,
             input_dim=input_dim,
             output_dim=output_dim,
             n_tags=n_tags,
-            epochs=10,
+            epochs=args.epochs,
             lr=1e-4,
         )
     print("Load model successfully.")
@@ -301,7 +316,7 @@ if __name__ == "__main__":
         "spam_detection",
         "emotion_classification",
     ]:
-        if method in ["Pretrained", "Ensemble"]:
+        if method in ["Pretrained"]:
             (
                 train_loss,
                 train_acc,
@@ -313,7 +328,7 @@ if __name__ == "__main__":
                 yval,
             ) = model.train(train_dataloader, val_dataloader)
             pred_test, ytest = model.test(test_dataloader)
-        elif method in ["RNN", "LSTM"]:
+        elif method in ["RNN", "LSTM", "TextCNN", "Ensemble"]:
             (
                 train_loss,
                 train_acc,
@@ -323,7 +338,7 @@ if __name__ == "__main__":
                 pred_val,
                 ytrain,
                 yval,
-            ) = model.train_process(model, train_dataloader, val_dataloader)
+            ) = model.train(model, train_dataloader, val_dataloader)
             pred_test, ytest = model.test(model, test_dataloader)
     elif task == "MT":
         train_losses = model.train(train_dataloader)

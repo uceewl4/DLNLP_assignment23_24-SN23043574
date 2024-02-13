@@ -10,8 +10,10 @@
 """
 import torch
 from torch import optim, nn
+from wordcloud import WordCloud
 from torch.utils.data import DataLoader, random_split
 import transformers
+import tensorflow_datasets as tfds
 from transformers import BertTokenizerFast, BertForQuestionAnswering
 from sklearn.metrics import f1_score
 from tqdm import tqdm
@@ -39,23 +41,27 @@ from A.sentiment_analysis.Ensemble import Ensemble as SA_Ensemble
 from A.sentiment_analysis.LSTM import LSTM as SA_LSTM
 from A.sentiment_analysis.Pretrained import Pretrained as SA_Pretrained
 from A.sentiment_analysis.RNN import RNN as SA_RNN
+from A.sentiment_analysis.TextCNN import TextCNN as SA_TextCNN
 from A.intent_recognition.Ensemble import Ensemble as IR_Ensemble
 from A.intent_recognition.LSTM import LSTM as IR_LSTM
 from A.intent_recognition.Pretrained import Pretrained as IR_Pretrained
 from A.intent_recognition.RNN import RNN as IR_RNN
+from A.intent_recognition.TextCNN import TextCNN as IR_TextCNN
 from A.emotion_classification.Ensemble import Ensemble as EC_Ensemble
 from A.emotion_classification.LSTM import LSTM as EC_LSTM
 from A.emotion_classification.Pretrained import Pretrained as EC_Pretrained
 from A.emotion_classification.RNN import RNN as EC_RNN
+from A.emotion_classification.TextCNN import TextCNN as EC_TextCNN
 from A.fake_news.Ensemble import Ensemble as FN_Ensemble
 from A.fake_news.LSTM import LSTM as FN_LSTM
 from A.fake_news.Pretrained import Pretrained as FN_Pretrained
 from A.fake_news.RNN import RNN as FN_RNN
+from A.fake_news.TextCNN import TextCNN as FN_TextCNN
 from A.spam_detection.Ensemble import Ensemble as SD_Ensemble
 from A.spam_detection.LSTM import LSTM as SD_LSTM
 from A.spam_detection.Pretrained import Pretrained as SD_Pretrained
 from A.spam_detection.RNN import RNN as SD_RNN
-from torchview import draw_graph
+from A.spam_detection.TextCNN import TextCNN as SD_TextCNN
 from sklearn.metrics import (
     confusion_matrix,
     roc_curve,
@@ -177,7 +183,20 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
     df_all = pd.read_csv(os.path.join(folder, f"all.csv"))
     df = pd.read_csv(os.path.join(folder, f"{type}.csv"))
 
-    if method in ["Pretrained", "RNN", "Ensemble"]:
+    # get word cloud
+    if type == "train":
+        text = " ".join(
+            word for sentence in df_all.iloc[:, 1] for word in sentence.split()
+        )
+        word_cloud = WordCloud(collocations=False, background_color="white").generate(
+            text
+        )
+        plt.figure(figsize=(10, 5))
+        plt.imshow(word_cloud, interpolation="bilinear")
+        plt.axis("off")
+        plt.savefig(f"Outputs/{task}/word_cloud")
+
+    if method in ["Pretrained", "RNN", "Ensemble", "TextCNN"]:
         # word
         # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
         tokenizer = LongformerTokenizer.from_pretrained("allenai/longformer-base-4096")
@@ -194,11 +213,11 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
         ]
         print(np.array(input_ids).shape)  # (44802,637)
     elif method in ["LSTM"]:
-        spacy.cli.download("en_core_web_md")
+        # spacy.cli.download("en_core_web_md")
         nlp_md = spacy.load("en_core_web_md")
         vocab = nlp_md.vocab
         sentences = nlp_md.pipe(
-            df_all.iloc[:, 1], disable=["parser", "ner"], batch_size=100, n_process=3
+            df.iloc[:, 1], disable=["parser", "ner"], batch_size=100, n_process=3
         )
         max_sentence_length = max(len(sentence) for sentence in df_all.iloc[:, 1])
         all_tokens = []
@@ -215,8 +234,8 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
         ]
         input_ids = pad_sequences(
             input_ids, maxlen=max_sentence_length, padding="post", truncating="post"
-        )
-        embeddings = nlp_md.vocab.vectors.data
+        )  # 1200,195
+        embeddings = nlp_md.vocab.vectors.data  # 20000,300
 
     # labels
     label2numeric = {
@@ -256,28 +275,30 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
         elif task == "fake_news":
             labels = [0 if numeric2label[i] != "true" else 1 for i in labels]
 
-    if method == "Pretrained":
+    if method in ["Pretrained", "Ensemble"]:
         attention_masks = [[1] * len(input_id) for input_id in input_ids]
         dataset = TensorDataset(  # 44802
             torch.tensor(input_ids),
             torch.tensor(attention_masks),
             torch.tensor(labels),
         )
-    elif method == "RNN":
+    elif method in ["RNN", "LSTM", "TextCNN"]:
         dataset = TensorDataset(torch.tensor(input_ids), torch.tensor(labels))  # 44802
     dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size, num_workers=0)
     print(next(iter(dataloader)))
 
     if method == "Pretrained":
         return dataloader
-    elif method in ["RNN", "Ensemble"]:
+    elif method in ["RNN", "Ensemble", "TextCNN"]:
         return dataloader, vocab
     elif method == "LSTM":
         return dataloader, vocab, embeddings
 
 
 def load_data_MT(batch_size=8):
-    dataset = load_dataset("alt")
+    # dataset = load_dataset("alt")
+    # dataset = load_dataset("alt-parallel")
+    dataset = tfds.load("huggingface:alt/alt-en")
     train_dataset = dataset["train"]
     test_dataset = dataset["test"]
     LANG_TOKEN_MAPPING = {"en": "<en>", "ja": "<jp>", "zh": "<zh>"}
@@ -291,7 +312,7 @@ def load_data_MT(batch_size=8):
         train_dataset, LANG_TOKEN_MAPPING, tokenizer, max_seq_len, batch_size=batch_size
     )
     test_generator = get_data_generator(
-        test_dataset, LANG_TOKEN_MAPPING, tokenizer, batch_size
+        test_dataset, LANG_TOKEN_MAPPING, tokenizer, max_seq_len, batch_size
     )
     return (
         train_generator,
@@ -408,6 +429,8 @@ def load_data_NER():
     data = pd.read_csv("B/ner_dataset.csv", encoding="unicode_escape")
     token2idx, idx2token = get_dict_map(data, "token")
     tag2idx, idx2tag = get_dict_map(data, "tag")
+    data["Word_idx"] = data["Word"].map(token2idx)
+    data["Tag_idx"] = data["Tag"].map(tag2idx)
     data_fillna = data.fillna(method="ffill", axis=0)
     data_group = data_fillna.groupby(["Sentence #"], as_index=False)[
         ["Word", "POS", "Tag", "Word_idx", "Tag_idx"]
@@ -442,22 +465,23 @@ def load_data_NER():
 
     n = 64  # batch_size
     x_train = torch.tensor(
-        batch_split(np.array(train_tokens), n, "input"), dtype=torch.int32
+        batch_split(np.array(train_tokens), n, input_length, "input"), dtype=torch.int32
     )
     y_train = torch.tensor(
-        batch_split(np.array(train_tags), n, "output"), dtype=torch.float32
+        batch_split(np.array(train_tags), n, input_length, "output"),
+        dtype=torch.float32,
     )
     x_valid = torch.tensor(
-        batch_split(np.array(val_tokens), n, "input"), dtype=torch.int32
+        batch_split(np.array(val_tokens), n, input_length, "input"), dtype=torch.int32
     )
     y_valid = torch.tensor(  # [64,104,12], one-hot encoder
-        batch_split(np.array(val_tags), n, "output"), dtype=torch.float32
+        batch_split(np.array(val_tags), n, input_length, "output"), dtype=torch.float32
     )
     x_test = torch.tensor(
-        batch_split(np.array(test_tokens), n, "input"), dtype=torch.int32
+        batch_split(np.array(test_tokens), n, input_length, "input"), dtype=torch.int32
     )
     y_test = torch.tensor(  # [64,104,12], one-hot encoder
-        batch_split(np.array(test_tags), n, "output"), dtype=torch.float32
+        batch_split(np.array(test_tags), n, input_length, "output"), dtype=torch.float32
     )
 
     return (
@@ -620,22 +644,20 @@ def load_model(
     grained="fine",
     tokenizer=None,
     batch_size=8,
+    multilabel=False,
 ):
     if task == "sentiment_analysis":
         if method == "Pretrained":
-            model = SA_Pretrained(
-                method=method, device=device, lr=lr, epochs=epochs, grained=grained
-            )
+            model = SA_Pretrained(method=method, device=device, lr=lr, epochs=epochs)
         elif method == "RNN":
             model = SA_RNN(
                 method=method,
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
-                grained=grained,
             )
         elif method == "LSTM":
             model = SA_LSTM(
@@ -643,10 +665,9 @@ def load_model(
                 device=device,
                 embeddings=embeddings,
                 output_dim=output_dim,
-                bidrectional=False,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
-                grained=grained,
             )
         elif method == "Ensemble":
             model = SA_Ensemble(
@@ -654,11 +675,19 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
-                grained=grained,
+            )
+        elif method == "TextCNN":
+            model = SA_TextCNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                epochs=epochs,
+                lr=lr,
             )
     elif task == "intent_recognition":
         if method == "Pretrained":
@@ -671,7 +700,7 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
@@ -679,10 +708,10 @@ def load_model(
         elif method == "LSTM":
             model = IR_LSTM(
                 method=method,
-                device=method,
+                device=device,
                 embeddings=embeddings,
                 output_dim=output_dim,
-                bidrectional=False,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
@@ -693,16 +722,30 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
                 grained=grained,
             )
+        elif method == "TextCNN":
+            model = IR_TextCNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                epochs=epochs,
+                lr=lr,
+                grained=grained,
+            )
     elif task == "emotion_classification":
         if method == "Pretrained":
             model = EC_Pretrained(
-                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+                method=method,
+                device=device,
+                lr=lr,
+                epochs=epochs,
+                multilabel=multilabel,
             )
         elif method == "RNN":
             model = EC_RNN(
@@ -710,7 +753,7 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
             )
@@ -720,7 +763,7 @@ def load_model(
                 device,
                 embeddings,
                 output_dim,
-                bidrectional=False,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
             )
@@ -730,10 +773,19 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
+            )
+        elif method == "TextCNN":
+            model = EC_TextCNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                epochs=epochs,
+                lr=lr,
             )
     elif task == "fake_news":
         if method == "Pretrained":
@@ -746,7 +798,7 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
@@ -754,10 +806,10 @@ def load_model(
         elif method == "LSTM":
             model = FN_LSTM(
                 method=method,
-                device=method,
+                device=device,
                 embeddings=embeddings,
                 output_dim=output_dim,
-                bidrectional=False,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
@@ -768,10 +820,20 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
+                grained=grained,
+            )
+        elif method == "TextCNN":
+            model = FN_TextCNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                epochs=epochs,
+                lr=lr,
                 grained=grained,
             )
     elif task == "spam_detection":
@@ -785,21 +847,19 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
-                grained=grained,
             )
         elif method == "LSTM":
             model = SD_LSTM(
                 method=method,
-                device=method,
+                device=device,
                 embeddings=embeddings,
                 output_dim=output_dim,
-                bidrectional=False,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
-                grained=grained,
             )
         elif method == "Ensemble":
             model = SD_Ensemble(
@@ -807,11 +867,19 @@ def load_model(
                 device=device,
                 input_dim=len(vocab),
                 output_dim=output_dim,
-                bidrectional=bidirectional,
+                bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
-                grained=grained,
+            )
+        elif method == "TextCNN":
+            model = SD_TextCNN(
+                method=method,
+                device=device,
+                input_dim=len(vocab),
+                output_dim=output_dim,
+                epochs=epochs,
+                lr=lr,
             )
     elif task == "MT":
         model = MT(

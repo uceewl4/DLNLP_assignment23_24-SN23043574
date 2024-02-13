@@ -33,7 +33,7 @@ import torch.nn.functional as F
 
 
 class Pretrained(nn.Module):
-    def __init__(self, method, device, epochs=10, lr=1e-5, grained="fine"):
+    def __init__(self, method, device, epochs=10, lr=1e-5):
         super(Pretrained, self).__init__()
         self.method = method
         self.device = device
@@ -146,18 +146,18 @@ class Pretrained(nn.Module):
                 val_epoch_losses.append(val_epoch_loss.item())
                 val_epoch_accs.append(val_epoch_acc)
 
-            print("Finish training.")
+        print("Finish training.")
 
-            return (
-                train_epoch_losses,
-                train_epoch_accs,
-                val_epoch_losses,
-                val_epoch_accs,
-                train_pred,
-                val_pred,
-                train_labels,
-                val_labels,
-            )
+        return (
+            train_epoch_losses,
+            train_epoch_accs,
+            val_epoch_losses,
+            val_epoch_accs,
+            train_pred,
+            val_pred,
+            train_labels,
+            val_labels,
+        )
 
     def test(self, test_dataloader):
         print("Start testing......")

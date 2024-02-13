@@ -33,11 +33,12 @@ import torch.nn.functional as F
 
 
 class Pretrained(nn.Module):
-    def __init__(self, method, device, epochs=10, lr=1e-5, grained="fine"):
+    def __init__(self, method, device, epochs=10, lr=1e-5, multilabel=False):
         super(Pretrained, self).__init__()
         self.method = method
         self.device = device
         self.num_class = 8
+        self.multilabel = multilabel
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
@@ -52,7 +53,7 @@ class Pretrained(nn.Module):
         self.epochs = epochs
         self.optimizer = Adam(self.model.parameters(), lr=self.lr)
 
-    def train(self, train_dataloader, val_dataloader):
+    def train_process(self, train_dataloader, val_dataloader):
         print("Start training......")
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
@@ -82,9 +83,17 @@ class Pretrained(nn.Module):
                 train_losses.append(train_loss.cpu().detach())
 
                 train_logits = train_output.logits
-                train_pred += torch.argmax(
-                    train_logits, dim=-1
-                ).tolist()  # from logits argmax
+                if self.multilabel == False:
+                    train_pred += torch.argmax(
+                        train_logits, dim=-1
+                    ).tolist()  # from logits argmax
+                elif self.multilabel == True:
+                    top_values, top_indices = torch.topk(train_logits, 3, dim=1)
+                    for index, i in enumerate(train_batch[2].tolist()):
+                        if i in top_indices[index]:
+                            train_pred.append(i)
+                        else:
+                            train_pred.append(torch.argmax(train_logits[index]))
                 train_labels += train_batch[2].tolist()
 
             train_pred = np.array(train_pred)
@@ -146,18 +155,18 @@ class Pretrained(nn.Module):
                 val_epoch_losses.append(val_epoch_loss.item())
                 val_epoch_accs.append(val_epoch_acc)
 
-            print("Finish training.")
+        print("Finish training.")
 
-            return (
-                train_epoch_losses,
-                train_epoch_accs,
-                val_epoch_losses,
-                val_epoch_accs,
-                train_pred,
-                val_pred,
-                train_labels,
-                val_labels,
-            )
+        return (
+            train_epoch_losses,
+            train_epoch_accs,
+            val_epoch_losses,
+            val_epoch_accs,
+            train_pred,
+            val_pred,
+            train_labels,
+            val_labels,
+        )
 
     def test(self, test_dataloader):
         print("Start testing......")

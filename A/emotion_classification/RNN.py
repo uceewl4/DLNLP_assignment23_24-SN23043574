@@ -27,7 +27,7 @@ class RNN(nn.Module):
         device,
         input_dim,
         output_dim,
-        bidrectional=False,
+        bidirectional=False,
         epochs=10,
         lr=1e-5,
     ):
@@ -42,9 +42,9 @@ class RNN(nn.Module):
             num_layers=20,
             batch_first=True,
             dropout=0.5,
-            bidirectional=bidrectional,
+            bidirectional=bidirectional,
         )  # input_size 每个词的维度，hidden_size 神经元的个数
-        if bidrectional:
+        if bidirectional:
             self.linear_1 = nn.Linear(
                 in_features=output_dim * 2, out_features=output_dim, bias=True
             )
@@ -71,11 +71,11 @@ class RNN(nn.Module):
         x = self.output(x)
         return x
 
-    def train_process(self, model, train_dataloader, val_dataloader):
+    def train(self, model, train_dataloader, val_dataloader):
         self.optimizer = Adam(model.parameters(), lr=self.lr)
         model.to(self.device)
         print("Start training......")
-        model.train()
+        # model.train()
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
 
@@ -113,7 +113,6 @@ class RNN(nn.Module):
             print(
                 f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}"
             )
-            print("Finish training.")
 
             # model.eval()
             val_pred, val_labels = [], []
@@ -151,6 +150,8 @@ class RNN(nn.Module):
             print(val_epoch_losses)
             print(val_epoch_accs)
 
+        print("Finish training.")
+
         return (
             train_epoch_losses,
             train_epoch_accs,
@@ -165,7 +166,7 @@ class RNN(nn.Module):
     def test(self, model, test_dataloader):
         print("Start testing......")
         # self.model.to(device)
-        model.eval()
+        # model.eval()
         test_losses, test_pred, test_labels = [], [], []
         progress_bar_test = tqdm(range(len(test_dataloader)))
 
