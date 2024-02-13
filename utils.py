@@ -296,9 +296,9 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
 
 
 def load_data_MT(batch_size=8):
-    # dataset = load_dataset("alt")
-    # dataset = load_dataset("alt-parallel")
-    dataset = tfds.load("huggingface:alt/alt-en")
+    dataset = load_dataset("alt")
+    # # dataset = load_dataset("alt-parallel")
+    # dataset = tfds.load("huggingface:alt/alt-en")
     train_dataset = dataset["train"]
     test_dataset = dataset["test"]
     LANG_TOKEN_MAPPING = {"en": "<en>", "ja": "<jp>", "zh": "<zh>"}
@@ -321,6 +321,7 @@ def load_data_MT(batch_size=8):
         train_dataset,
         test_dataset,
         LANG_TOKEN_MAPPING,
+        max_seq_len
     )
 
 
@@ -389,8 +390,10 @@ def transform_batch(batch, lang_token_map, tokenizer, max_seq_len):
         inputs.append(input_ids.unsqueeze(0))
         targets.append(target_ids.unsqueeze(0))
 
-    batch_input_ids = torch.cat(inputs).cuda()
-    batch_target_ids = torch.cat(targets).cuda()
+    # batch_input_ids = torch.cat(inputs).cuda()
+    # batch_target_ids = torch.cat(targets).cuda()
+    batch_input_ids = torch.cat(inputs)
+    batch_target_ids = torch.cat(targets)
 
     return batch_input_ids, batch_target_ids
 

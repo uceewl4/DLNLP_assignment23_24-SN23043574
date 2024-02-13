@@ -57,14 +57,11 @@ class MT(nn.Module):
         self.batch_size = batch_size
         self.optimizer = AdamW(self.model.parameters(), lr=lr)
 
-    def train(self, train_dataloader):
+    def train(self, train_dataloader, train_dataset):
         print("Start training......")
         losses = []
         for epoch_idx in range(self.epochs):
-            for batch_idx, (input_batch, label_batch) in tqdm(
-                enumerate(train_dataloader),
-                total=int(np.ceil(len(train_dataloader) / self.batch_size)),
-            ):
+            for batch_idx, (input_batch, label_batch) in enumerate(train_dataloader):
                 self.optimizer.zero_grad()
 
                 # Forward pass
@@ -79,17 +76,17 @@ class MT(nn.Module):
                 self.optimizer.step()
 
                 # Print training update info
-                if (batch_idx + 1) % 50 == 0:
-                    avg_loss = np.mean(losses[-50:])
+                if (batch_idx + 1) % 10 == 0:
+                    avg_loss = np.mean(losses[-10:])
                     print(
                         "Epoch: {} | Step: {} | Avg. loss: {:.3f}".format(
                             epoch_idx + 1, batch_idx + 1, avg_loss
                         )
                     )
 
-                print("Finish training.")
+        print("Finish training.")
 
-                return losses
+        return losses
 
     def test(self, test_dataloader, max_iters=8):
         print("Start testing......")

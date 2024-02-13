@@ -198,6 +198,7 @@ if __name__ == "__main__":
             train_dataset,
             test_dataset,
             LANG_TOKEN_MAPPING,
+            max_seq_len,
         ) = load_data_MT(args.batch_size)
     if task == "QA":
         train_dataloader, val_dataloader, test_dataloader = load_data_QA(
@@ -341,8 +342,8 @@ if __name__ == "__main__":
             ) = model.train(model, train_dataloader, val_dataloader)
             pred_test, ytest = model.test(model, test_dataloader)
     elif task == "MT":
-        train_losses = model.train(train_dataloader)
-        test_losses = model.test(test_dataloader)
+        train_losses = model.train(train_generator, train_dataset)
+        test_losses = model.test(test_generator)
         # manual test
         test_sentence = test_dataset[0]["translation"]["en"]
         print("Raw input text:", test_sentence)
@@ -350,10 +351,11 @@ if __name__ == "__main__":
             text=test_sentence,
             target_lang="ja",
             tokenizer=tokenizer,
-            seq_len=model.config.max_length,
+            seq_len=model.model.config.max_length,
             lang_token_map=LANG_TOKEN_MAPPING,
         )
-        input_ids = input_ids.unsqueeze(0).cuda()
+        # input_ids = input_ids.unsqueeze(0).cuda()
+        input_ids = input_ids.unsqueeze(0)
 
         print(
             "Truncated input text:",
@@ -361,7 +363,9 @@ if __name__ == "__main__":
                 tokenizer.convert_ids_to_tokens(input_ids[0])
             ),
         )
-        output_tokens = model.generate(input_ids, num_beams=10, num_return_sequences=3)
+        output_tokens = model.model.generate(
+            input_ids, num_beams=10, num_return_sequences=3
+        )
         # print(output_tokens)
         for token_set in output_tokens:
             print(tokenizer.decode(token_set, skip_special_tokens=True))
