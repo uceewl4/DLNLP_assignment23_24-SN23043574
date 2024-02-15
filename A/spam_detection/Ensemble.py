@@ -36,10 +36,12 @@ class Ensemble(nn.Module):
         epochs=10,
         lr=1e-5,
         alpha=0.5,
+        multilabel=False,
     ):
         super(Ensemble, self).__init__()
         self.method = method
         self.device = device
+        self.multilabel = multilabel
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
@@ -98,9 +100,20 @@ class Ensemble(nn.Module):
                 progress_bar.update(1)
                 train_losses.append(total_train_loss.item())
 
-                train_pred += torch.argmax(total_train_prob, dim=-1).tolist()
+                if self.multilabel == False:
+                    train_pred += torch.argmax(
+                        total_train_prob, dim=-1
+                    ).tolist()  # from logits argmax
+                elif self.multilabel == True:
+                    top_values, top_indices = torch.topk(total_train_prob, 3, dim=1)
+                    for index, i in enumerate(train_batch[2].tolist()):
+                        if i in top_indices[index]:
+                            train_pred.append(i)
+                        else:
+                            train_pred.append(
+                                torch.argmax(total_train_prob[index]).item()
+                            )
                 train_labels += train_batch[2].tolist()
-
             train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
             train_epoch_losses.append(train_epoch_loss)
@@ -151,9 +164,19 @@ class Ensemble(nn.Module):
                     total_val_loss.backward()
                     self.optimizer.step()  # Update model parameters
                     progress_bar_val.update(1)
-                    val_pred += torch.argmax(
-                        total_val_prob, dim=-1
-                    ).tolist()  # from logits argmaxput[0], dim=-1)
+                    if self.multilabel == False:
+                        val_pred += torch.argmax(
+                            total_val_prob, dim=-1
+                        ).tolist()  # from logits argmax
+                    elif self.multilabel == True:
+                        top_values, top_indices = torch.topk(total_val_prob, 3, dim=1)
+                        for index, i in enumerate(val_batch[2].tolist()):
+                            if i in top_indices[index]:
+                                val_pred.append(i)
+                            else:
+                                val_pred.append(
+                                    torch.argmax(total_val_prob[index]).item()
+                                )
                     val_labels += val_batch[2].tolist()
                     val_losses.append(total_val_loss.item())
 
@@ -225,8 +248,19 @@ class Ensemble(nn.Module):
                 )
                 total_test_loss = self.loss_fn(total_test_prob, test_label)
                 progress_bar_test.update(1)
-                test_pred += torch.argmax(total_test_prob, dim=-1).tolist()
-
+                if self.multilabel == False:
+                    test_pred += torch.argmax(
+                        total_test_prob, dim=-1
+                    ).tolist()  # from logits argmax
+                elif self.multilabel == True:
+                    top_values, top_indices = torch.topk(total_test_prob, 3, dim=1)
+                    for index, i in enumerate(test_batch[2].tolist()):
+                        if i in top_indices[index]:
+                            total_test_prob.append(i)
+                        else:
+                            test_pred.append(
+                                torch.argmax(total_test_prob[index]).item()
+                            )
                 test_labels += test_batch[2].tolist()
                 test_losses.append(total_test_loss.item())
             test_pred = np.array(test_pred)

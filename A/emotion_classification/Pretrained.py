@@ -53,7 +53,7 @@ class Pretrained(nn.Module):
         self.epochs = epochs
         self.optimizer = Adam(self.model.parameters(), lr=self.lr)
 
-    def train_process(self, train_dataloader, val_dataloader):
+    def train(self, train_dataloader, val_dataloader):
         print("Start training......")
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
@@ -93,7 +93,7 @@ class Pretrained(nn.Module):
                         if i in top_indices[index]:
                             train_pred.append(i)
                         else:
-                            train_pred.append(torch.argmax(train_logits[index]))
+                            train_pred.append(torch.argmax(train_logits[index]).item())
                 train_labels += train_batch[2].tolist()
 
             train_pred = np.array(train_pred)
@@ -134,9 +134,17 @@ class Pretrained(nn.Module):
                     )
                     val_loss = val_output.loss
                     val_logits = val_output.logits
-                    val_pred += torch.argmax(
-                        val_logits, dim=-1
-                    ).tolist()  # from logits argmax
+                    if self.multilabel == False:
+                        val_pred += torch.argmax(
+                            val_logits, dim=-1
+                        ).tolist()  # from logits argmax
+                    elif self.multilabel == True:
+                        top_values, top_indices = torch.topk(val_logits, 3, dim=1)
+                        for index, i in enumerate(val_batch[2].tolist()):
+                            if i in top_indices[index]:
+                                val_pred.append(i)
+                            else:
+                                val_pred.append(torch.argmax(val_logits[index]).item())
                     val_labels += val_batch[2].tolist()
 
                     val_losses.append(val_loss)
@@ -195,9 +203,17 @@ class Pretrained(nn.Module):
                 test_logits = test_output.logits
                 progress_bar_test.update(1)
 
-                test_pred += torch.argmax(
-                    test_logits, dim=-1
-                ).tolist()  # from logits argmax
+                if self.multilabel == False:
+                    test_pred += torch.argmax(
+                        test_logits, dim=-1
+                    ).tolist()  # from logits argmax
+                elif self.multilabel == True:
+                    top_values, top_indices = torch.topk(test_logits, 3, dim=1)
+                    for index, i in enumerate(test_batch[2].tolist()):
+                        if i in top_indices[index]:
+                            test_pred.append(i)
+                        else:
+                            test_pred.append(torch.argmax(test_logits[index]).item())
                 test_labels += test_batch[2].tolist()
                 test_losses.append(test_loss)
             test_pred = np.array(test_pred)

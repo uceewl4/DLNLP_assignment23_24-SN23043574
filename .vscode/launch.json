@@ -14,9 +14,10 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-            "--task","MT",
-            // "--epochs","1",
-            // "--multilabel","True",
+            "--task","emotion_classification",
+            "--epochs","1",
+            "--multilabel","True",
+            "--method","Pretrained"
             ]
         }
     ]
