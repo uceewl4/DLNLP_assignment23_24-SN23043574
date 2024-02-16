@@ -105,28 +105,28 @@ print(res[0]["generated_text"])
 
 # model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 # print(model.max_seq_length)
-# corpus = "Science can be described as a complex, self-organizing, \
-# and evolving network of scholars, projects, papers, and ideas. \
-# This representation has unveiled patterns characterizing the emergence \
-# of new scientific fields through the study of collaboration networks and \
-# the path of impactful discoveries through the study of citation networks. \
-# Microscopic models have traced the dynamics of citation accumulation, \
-# allowing us to predict the future impact of individual papers. \
-# SciSci has revealed choices and trade-offs that scientists face as \
-# they advance both their own careers and the scientific horizon. \
-# For example, measurements indicate that scholars are risk-averse, \
-# preferring to study topics related to their current expertise, \
-# which constrains the potential of future discoveries. \
-# Those willing to break this pattern engage in riskier careers but become \
-# more likely to make major breakthroughs. Overall, the highest-impact science \
-# is grounded in conventional combinations of prior work but features unusual \
-# combinations. Last, as the locus of research is shifting into teams, \
-# SciSci is increasingly focused on the impact of team research, \
-# finding that small teams tend to disrupt science and technology with \
-# new ideas drawing on older and less prevalent ones. \
-# In contrast, large teams tend to develop recent, popular ideas, obtaining high, but often short-lived, impact.".split(
-#     "."
-# )
+corpus = "Science can be described as a complex, self-organizing, \
+and evolving network of scholars, projects, papers, and ideas. \
+This representation has unveiled patterns characterizing the emergence \
+of new scientific fields through the study of collaboration networks and \
+the path of impactful discoveries through the study of citation networks. \
+Microscopic models have traced the dynamics of citation accumulation, \
+allowing us to predict the future impact of individual papers. \
+SciSci has revealed choices and trade-offs that scientists face as \
+they advance both their own careers and the scientific horizon. \
+For example, measurements indicate that scholars are risk-averse, \
+preferring to study topics related to their current expertise, \
+which constrains the potential of future discoveries. \
+Those willing to break this pattern engage in riskier careers but become \
+more likely to make major breakthroughs. Overall, the highest-impact science \
+is grounded in conventional combinations of prior work but features unusual \
+combinations. Last, as the locus of research is shifting into teams, \
+SciSci is increasingly focused on the impact of team research, \
+finding that small teams tend to disrupt science and technology with \
+new ideas drawing on older and less prevalent ones. \
+In contrast, large teams tend to develop recent, popular ideas, obtaining high, but often short-lived, impact.".split(
+    "."
+)
 # print(corpus)
 # corpus_embedding = model.encode(corpus, show_progress_bar=True)
 # # corpus_embeddings.shape

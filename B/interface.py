@@ -18,6 +18,7 @@ from streamlit_chat import message
 import os
 
 from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
 
 
@@ -79,14 +80,14 @@ with st.sidebar:  # sidebar of the system, NLP interactive tasks system NLPITS
             "Story telling",
             "Help",
         ],
-        menu_icon="hospital",
+        menu_icon="android",
         icons=[
             "compass",
-            "clipboard2-pulse",
-            "clipboard2-pulse",
-            "clipboard2-pulse",
-            "clipboard2-pulse",
-            "envelope",
+            "chat",
+            "emoji-smile",
+            "text-paragraph",
+            "translate",
+            "book",
             "question-circle",
         ],
         default_index=0,
@@ -94,65 +95,99 @@ with st.sidebar:  # sidebar of the system, NLP interactive tasks system NLPITS
 
 # welcome
 if choose == "Welcome":  # instruction page
-    st.title("🎊 Welcome to DDI!")
+    st.title("🎊 Welcome to NLPITS!")
     st.write(
-        "Hi, welcome to the digital system of Disease Diagnosis with Image (DDI). This is the instruction page for DDI"
-        + ", a digital system supported by AI solutions. New patients of this app can refer to the "
+        "Hi, welcome to the Natural Language Processing Interactive Tasks System (NLPITS). This is the instruction page for NLPITS"
+        + ", an integrated natural language processing kit. New users of this app can refer to the "
         + "following sections as guidelines. 👇"
     )
 
-    st.header("Diagnosis")
+    st.header("Chatbot")
     with st.expander("See details", expanded=True):
         st.write(
-            "This is where you can make digital diagnosis for possible diseases with images."
+            "This is where you can make real-time communication with a Chatgpt-like assistant."
         )
-        st.subheader(
-            "👉 Want to diagnose for pneumonia? " " -- See our *Pneumonia* section."
-        )
+        st.subheader("👉 Want to talk to our chatbot?" " -- See our *Chatbot* section.")
         st.write(
-            "• The **Pneumonia** takes your uploaded *:blue[chest X-ray slides]* for diagnosis. "
-            + "Please ensure that your file format is valid and clear "
-            + "to guarantee accurate result."
+            "• The **Chatbot** will respond to your required messages *:blue[at sidebar]* in a communicative way!"
         )
 
-        st.subheader(
-            "👉 Feel hard to classify for hematoxylin & eosin stained "
-            + "histological tissue images? -- *CRC* helps."
-        )
-        st.write("• Upload your tissue image.")
-        st.write(
-            "• Make digital classification for *:blue[9 types]* of tissue (ADI, BACK, DEB, etc)."
-        )
-        st.write("• Get your tissue classification result supported by AI solutions!")
-
-    st.header("Feedback")
+    st.header("Sentiment&Intent")
     with st.expander("See details", expanded=True):
         st.write(
-            "This is the place for medical advice and additional diagnostic info survey."
+            "This is the place for determining the sentiment and intent of your sentences."
         )
         st.subheader(
-            "👉 Want to check medical advice from specialists?" "-- *Advice* helps."
+            "👉 Want to check your sentiment?" "-- *Sentiment classification* helps."
         )
         st.write(
-            "• **Specialists for each disease** can leave medical advice for patients accompanied with AI diagnosis."
-        )
-        st.write(
-            "• Your medical advice will be sent as"
-            + " *:blue[automatic system email]*. 📬"
+            "• Sentences can be fed to further analyze latent sentiment and emotions as **positive, negative and neutral**."
         )
 
-        st.subheader(
-            "🙌 Additional diagnostic survey for comprehensive knowledge of your condition!"
-        )
+        st.subheader("🙌 Additional tool for intent recognition!")
+        st.write("• Input your sentence to analyze embedded intent and purposes.")
+
+    st.header("Sentence analysis")
+    with st.expander("See details", expanded=True):
         st.write(
-            "• We appreciate your time for providing additional infomation on your recent"
-            + " health condition, which can give more insights for specialists to diagnose."
+            "This is the place for analyzing sentence structure with name entity recognition, part of speech tagging, coreference resolution and dependency parsing."
+        )
+        st.subheader("👉 Want to recognize name entity?" "-- *NER* helps.")
+        st.write(
+            "• Figure out name entity in your sentence with **name, person, location, etc.**"
+        )
+
+        st.subheader("🙌 Assign syntax meaning for part of speech tagging!")
+        st.write("• See our *POS-tagging section* to analyze syntax structure.")
+
+        st.subheader("👉 Want to connect coreference resolution?")
+        st.write("• Click for this section to analyze coreferences in the text.")
+
+        st.subheader("🙌 Hierarchy for dependency parsing!")
+        st.write(
+            "• See this section to parse dependency embedded in sentences and words."
+        )
+
+    st.header("Machine comprehension")
+    with st.expander("See details", expanded=True):
+        st.write(
+            "This is the place for performing machine comprehension tasks like Q&A, text summarization, translation and semantic similarity analysis."
+        )
+        st.subheader("👉 Want to conduct question answering?")
+        st.write(
+            "• Click on *Question answering* section to figure out answer from given passages."
+        )
+
+        st.subheader("🙌 Summrize your articles as abstract!")
+        st.write("• See our *Text summarization* to conclude your article.")
+
+        st.subheader("👉 Want to translate between multiple languages?")
+        st.write(
+            "• Click for *Machine translation* to translate between **Chinese and English**."
+        )
+
+        st.subheader("🙌 Check similarity for your essay!")
+        st.write(
+            "• See *Semantic textual similarity* section to compare your essays with others."
+        )
+
+    st.header("Story telling")
+    with st.expander("See details", expanded=True):
+        st.write(
+            "This is the place for multimodal conversion between **text, audio and image** for story telling."
+        )
+        st.subheader("👉 Want to convert your image into text?")
+        st.write("• Images with .JPG format can be described as text automatically!")
+
+        st.subheader("🙌 Generate story for background text!")
+        st.write(
+            "• Create new story based on your required scenario and convert it into audio teller."
         )
 
     st.header("Help")
     with st.expander("See details", expanded=True):
         st.write(
-            "Contact **DDI Developer Team** if you have any problems or suggestions. Glad to see your "
+            "Contact **NLPITS Developer Team** if you have any problems or suggestions. Glad to see your "
             + "contribution."
         )
 
@@ -188,7 +223,7 @@ elif choose == "Sentiment&Intent":
     task = option_menu(
         None,
         ["Sentiment classification", "Intent recognition"],
-        icons=["lungs", "eyedropper"],
+        icons=["hand-thumbs-up", "heart"],
         default_index=0,
         orientation="horizontal",
     )
@@ -252,33 +287,33 @@ elif choose == "Sentence analysis":
                     if ":" in i:
                         st.write(i)
 
-    with tab3:
-        # python3 -m spacy download en_core_web_sm
-        text = st.text_area("Text to analyze", key="tab3")
-        if text != "":
-            with st.spinner("Wait for it..."):
-                # os.system("python3 -m spacy download en_core_web_sm")
-                # os.system(
-                #     "pip install https://github.com/explosion/spacy-experimental/releases/download/v0.6.0/en_coreference_web_trf-3.4.0a0-py3-none-any.whl"
-                # )
-                nlp = spacy.load("en_coreference_web_trf")
-                doc = nlp(text)
-            # res = doc.spans["coref_clusters_1"]
-            # st.success("")
-            st.text_area(
-                "Coreference resolution",
-                f"{str(list(doc.spans.values()))[1:-1]}",
-                key="res",
-            )
-            print(doc.spans)
+    # with tab3:
+    #     # python3 -m spacy download en_core_web_sm
+    #     text = st.text_area("Text to analyze", key="tab3")
+    #     if text != "":
+    #         with st.spinner("Wait for it..."):
+    #             # os.system("python3 -m spacy download en_core_web_sm")
+    #             # os.system(
+    #             #     "pip install https://github.com/explosion/spacy-experimental/releases/download/v0.6.0/en_coreference_web_trf-3.4.0a0-py3-none-any.whl"
+    #             # )
+    #             nlp = spacy.load("en_coreference_web_trf")
+    #             doc = nlp(text)
+    #         # res = doc.spans["coref_clusters_1"]
+    #         # st.success("")
+    #         st.text_area(
+    #             "Coreference resolution",
+    #             f"{str(list(doc.spans.values()))[1:-1]}",
+    #             key="res",
+    #         )
+    #         print(doc.spans)
 
-    with tab4:
-        text = st.text_area("Text to analyze", key="DP")
-        with st.spinner("Wait for it..."):
-            nlp = spacy.load("en_core_web_sm")
-            doc = nlp(text)
-            dep_svg = displacy.render(doc, style="dep", jupyter=False)
-        st.image(dep_svg, use_column_width=True)
+    # with tab4:
+    #     text = st.text_area("Text to analyze", key="DP")
+    #     with st.spinner("Wait for it..."):
+    #         nlp = spacy.load("en_core_web_sm")
+    #         doc = nlp(text)
+    #         dep_svg = displacy.render(doc, style="dep", jupyter=False)
+    #     st.image(dep_svg, use_column_width=True)
 
 elif choose == "Machine comprehension":
     task = option_menu(
@@ -289,7 +324,7 @@ elif choose == "Machine comprehension":
             "Machine translation",
             "Semantic textual similarity",
         ],
-        icons=["lungs", "eyedropper", "eyedropper", "eyedropper"],
+        icons=["blockquote-right", "body-text", "google", "check"],
         default_index=0,
         orientation="horizontal",
     )
@@ -391,7 +426,7 @@ elif choose == "Story telling":
     task = option_menu(
         None,
         ["Image to text", "Text to story"],
-        icons=["lungs", "eyedropper"],
+        icons=["card-image", "file-music"],
         default_index=0,
         orientation="horizontal",
     )
@@ -466,79 +501,6 @@ elif choose == "Story telling":
                 ).content
                 st.audio(audio_bytes, format="audio/wav")
 
-    # if task == "Question answering":
-    #     # image uploaded by patients
-
-    #     passage = st.text_area("Please input your passage")
-    #     question = st.text_input("Please input your question")
-    #     if passage != "" and question != "":
-    #         with st.spinner("Wait for it..."):
-    #             qa = pipeline(
-    #                 "question-answering",
-    #                 model="deepset/roberta-base-squad2",
-    #                 tokenizer="deepset/roberta-base-squad2",
-    #             )
-    #             answer = qa(question, passage)["answer"]
-    #         res = st.text_area("Answer", answer, key="answer")
-
-    # elif task == "Text summarization":
-    #     article = st.text_area("Please input your article")
-    #     if article != "":
-    #         with st.spinner("Wait for it..."):
-    #             model = T5ForConditionalGeneration.from_pretrained("t5-small")
-    #             tokenizer = T5Tokenizer.from_pretrained("t5-small")
-    #             t5_input_text = "summarize: " + article
-    #             tokenized_text = tokenizer.encode(
-    #                 t5_input_text, return_tensors="pt", max_length=1024
-    #             )
-    #             summary_ids = model.generate(
-    #                 tokenized_text, min_length=30, max_length=512
-    #             )
-    #             summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    #         res = st.text_area("Summary", summary, key="summary")
-
-    # elif task == "Machine translation":
-    #     col1, col2 = st.columns(2)
-    #     with col1:
-    #         la_from = st.selectbox(
-    #             "from", tuple(sorted(list(googletrans.LANGUAGES.keys())))
-    #         )
-    #         original = st.text_area("Please input your sentences", height=600)
-    #     with col2:
-    #         la_dest = st.selectbox(
-    #             "dest", tuple(sorted(list(googletrans.LANGUAGES.keys())))
-    #         )
-    #         with st.spinner("Wait for it..."):
-    #             if original != "":
-    #                 translator = googletrans.Translator()
-    #                 translate = translator.translate(original, dest=str(la_dest))
-    #                 res = st.text_area("Translation", translate.text, height=600)
-
-    # elif task == "Semantic textual similarity":
-    #     col1, col2 = st.columns(2)
-    #     with col1:
-    #         corpus = st.text_area("Please input your essay", height=400)
-    #         print(corpus)
-    #     with col2:
-    #         sentence = st.text_area("Please input your sentence", height=100)
-    #         with st.spinner("Wait for it..."):
-    #             if corpus != "" and sentence != "":
-    #                 corpus = str(corpus).split(".")[:-1]
-    #                 model = SentenceTransformer(
-    #                     "sentence-transformers/all-mpnet-base-v2"
-    #                 )
-    #                 corpus_embedding = model.encode(corpus, show_progress_bar=True)
-    #                 query_embedding = model.encode(sentence)
-    #                 search = util.semantic_search(query_embedding, corpus_embedding)[0]
-    #                 for item in search:
-    #                     st.write(
-    #                         str(round(item["score"] * 100, 2))
-    #                         + "% "
-    #                         + str(corpus[item["corpus_id"]])
-    #                         + "\n"
-    #                     )
-
-
 # help
 elif choose == "Help":
     st.title("Help")
@@ -551,7 +513,7 @@ elif choose == "Help":
                 st.text("\n")
             st.markdown("**Official tel:**")
         with col2:
-            st.code("DDI_official2023@163.com", language="markdown")
+            st.code("NLPITS_official2024@163.com", language="markdown")
             st.code("+44-7551167050", language="markdown")
 
         from_addr = "2387324762@qq.com"
@@ -566,16 +528,16 @@ elif choose == "Help":
         contact = st.form_submit_button("Contact")
         if contact:
             msg = MIMEText(
-                "Dear DDI Developer Team,\n" + "  " + message + "\n"
+                "Dear NLPITS Developer Team,\n" + "  " + message + "\n"
                 "\n"
                 "Best regards,\n"
-                "Message from DDI",
+                "Message from NLPITS",
                 "plain",
                 "utf-8",
             )
             msg["From"] = Header(from_addr)
             msg["To"] = Header(from_addr)
-            subject = f"DDI: Help & Contact message"
+            subject = f"NLPITS: Help & Contact message"
             msg["Subject"] = Header(subject, "utf-8")
 
             try:
