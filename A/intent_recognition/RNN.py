@@ -42,9 +42,9 @@ class RNN(nn.Module):
         self.rnn = nn.RNN(
             input_size=output_dim,
             hidden_size=output_dim,
-            num_layers=20,
+            num_layers=64,
             batch_first=True,
-            dropout=0.5,
+            # dropout=0.5,
             bidirectional=bidirectional,
         )  # input_size 每个词的维度，hidden_size 神经元的个数
         self.out_features = 20 if grained == "fine" else 2
@@ -57,9 +57,16 @@ class RNN(nn.Module):
                 in_features=output_dim, out_features=int(output_dim / 2), bias=True
             )
         self.activation = nn.ReLU()
-        self.linear_2 = nn.Linear(
-            in_features=int(output_dim / 2), out_features=self.out_features, bias=True
-        )
+        if bidirectional:
+            self.linear_2 = nn.Linear(
+                in_features=output_dim, out_features=self.out_features, bias=True
+            )
+        else:
+            self.linear_2 = nn.Linear(
+                in_features=int(output_dim / 2),
+                out_features=self.out_features,
+                bias=True,
+            )
         self.output = nn.Softmax()
         self.loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -104,12 +111,12 @@ class RNN(nn.Module):
                     ).tolist()  # from logits argmax
                 elif self.multilabel == True:
                     top_values, top_indices = torch.topk(train_output, 3, dim=1)
-                    for index, i in enumerate(train_batch[2].tolist()):
+                    for index, i in enumerate(train_batch[1].tolist()):
                         if i in top_indices[index]:
                             train_pred.append(i)
                         else:
                             train_pred.append(torch.argmax(train_output[index]).item())
-                train_labels += train_batch[2].tolist()
+                train_labels += train_batch[1].tolist()
 
             train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
@@ -149,12 +156,12 @@ class RNN(nn.Module):
                     ).tolist()  # from logits argmax
                 elif self.multilabel == True:
                     top_values, top_indices = torch.topk(val_output, 3, dim=1)
-                    for index, i in enumerate(val_batch[2].tolist()):
+                    for index, i in enumerate(val_batch[1].tolist()):
                         if i in top_indices[index]:
                             val_pred.append(i)
                         else:
                             val_pred.append(torch.argmax(val_output[index]).item())
-                val_labels += val_batch[2].tolist()
+                val_labels += val_batch[1].tolist()
                 val_losses.append(val_loss.item())
 
             val_pred = np.array(val_pred)
@@ -205,12 +212,12 @@ class RNN(nn.Module):
                     ).tolist()  # from logits argmax
                 elif self.multilabel == True:
                     top_values, top_indices = torch.topk(test_output, 3, dim=1)
-                    for index, i in enumerate(test_batch[2].tolist()):
+                    for index, i in enumerate(test_batch[1].tolist()):
                         if i in top_indices[index]:
                             test_pred.append(i)
                         else:
                             test_pred.append(torch.argmax(test_output[index]).item())
-                test_labels += test_batch[2].tolist()
+                test_labels += test_batch[1].tolist()
                 test_losses.append(test_loss)
             test_pred = np.array(test_pred)
             print(f"Finish testing. Test loss: {np.array(test_losses).mean()}")

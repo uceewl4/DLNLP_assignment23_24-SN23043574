@@ -13,6 +13,11 @@ from langchain import LLMChain, PromptTemplate
 from langchain import HuggingFaceHub
 import requests
 from streamlit_chat import message
+from transformers import (
+    AutoModelForSequenceClassification,
+    LongformerForSequenceClassification,
+    LongformerTokenizer,
+)
 
 # from dotenv import load_dotenv
 import os
@@ -20,6 +25,7 @@ import os
 from langchain.chat_models import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
+from A.intent_recognition import Pretrained as IR_Pretrained
 
 
 # rcoreference resolution
@@ -250,7 +256,57 @@ elif choose == "Sentiment&Intent":
     elif task == "Intent recognition":
         input = st.text_input("Please input your sentence")
         with st.spinner("Wait for it..."):
-            pass
+            model = IR_Pretrained(
+                method="Pretrained",
+                device="cpu",
+                lr=0.0001,
+                epochs=10,
+                grained="fine",
+                multilabel=False,
+            )
+            model.model.load_state_dict(
+                torch.load("Outputs/intent_recognition/fine_pretrained.pt")
+            )
+            tokenizer = LongformerTokenizer.from_pretrained(
+                "allenai/longformer-base-4096"
+            )
+            input_ids = tokenizer.encode(
+                input,
+                add_special_tokens=True,
+                padding="max_length",
+            )
+            attention_mask = [1] * len(input_ids)
+            output_logits = model.model(
+                input_ids,
+                attention_mask=attention_mask,
+            )
+            pred = torch.argmax(output_logits, dim=-1).item()  # from logits argmax
+            labels = [
+                "Complain",
+                "Praise",
+                "Apologize",
+                "Thank",
+                "Criticize",
+                "Care",
+                "Agree",
+                "Taunt",
+                "Flaunt",
+                "Oppose",
+                "Joke",
+                "Inform",
+                "Advise",
+                "Arrange",
+                "Introduce",
+                "Comfort",
+                "Leave",
+                "Prevent",
+                "Greet",
+                "Ask for help",
+            ]
+            label_map = {index: i for index, i in enumerate(labels)}
+            res = label_map[pred]
+        if res != "":
+            st.success(f"Your intent is {res}")
             # load mintec model
             # intent_task = pipeline(
             #     "text-classification", model="Falconsai/intent_classification"

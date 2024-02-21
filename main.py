@@ -248,6 +248,7 @@ if __name__ == "__main__":
                 lr=args.lr,
                 epochs=args.epochs,
                 grained=args.grained,
+                multilabel=args.multilabel,
             )
         elif method == "LSTM":
             model = load_model(
@@ -261,6 +262,7 @@ if __name__ == "__main__":
                 lr=args.lr,
                 epochs=args.epochs,
                 grained=args.grained,
+                multilabel=args.multilabel,
             )
         elif method in ["Ensemble"]:
             model = load_model(
@@ -273,6 +275,7 @@ if __name__ == "__main__":
                 lr=args.lr,
                 epochs=args.epochs,
                 grained=args.grained,
+                multilabel=args.multilabel,
             )
     elif task == "MT":
         model = load_model(
@@ -329,6 +332,11 @@ if __name__ == "__main__":
                 yval,
             ) = model.train(train_dataloader, val_dataloader)
             pred_test, ytest = model.test(test_dataloader)
+            if task == "intent_recognition" and args.grained == "fine":
+                torch.save(
+                    model.model.state_dict(),
+                    "Outputs/intent_recognition/fine_pretrained.pt",
+                )
         elif method in ["RNN", "LSTM", "TextCNN", "Ensemble"]:
             (
                 train_loss,

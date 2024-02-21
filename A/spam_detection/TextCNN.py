@@ -15,22 +15,13 @@ from sklearn.metrics import accuracy_score
 
 class TextCNN(nn.Module):
     def __init__(
-        self,
-        method,
-        device,
-        input_dim,
-        output_dim,
-        n_filters=100,
-        epochs=10,
-        lr=1e-5,
-        multilabel=False,
+        self, method, device, input_dim, output_dim, n_filters=100, epochs=10, lr=1e-5
     ):
         super(TextCNN, self).__init__()
         self.method = method
         self.device = device
         self.filters_sizes = [3, 4, 5]
         self.num_class = 2
-        self.multilabel = multilabel
         self.embedding = nn.Embedding(input_dim, output_dim)
         self.convs = nn.ModuleList(
             [
@@ -91,18 +82,10 @@ class TextCNN(nn.Module):
                 progress_bar.update(1)
                 train_losses.append(train_loss.item())
 
-                if self.multilabel == False:
-                    train_pred += torch.argmax(
-                        train_output, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(train_output, 3, dim=1)
-                    for index, i in enumerate(train_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            train_pred.append(i)
-                        else:
-                            train_pred.append(torch.argmax(train_output[index]).item())
-                train_labels += train_batch[2].tolist()
+                train_pred += torch.argmax(
+                    train_output, dim=-1
+                ).tolist()  # from logits argmax
+                train_labels += train_batch[1].tolist()
 
             train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
@@ -137,18 +120,10 @@ class TextCNN(nn.Module):
                 self.optimizer.step()  # Update model parameters
                 progress_bar_val.update(1)
 
-                if self.multilabel == False:
-                    val_pred += torch.argmax(
-                        val_output, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(val_output, 3, dim=1)
-                    for index, i in enumerate(val_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            val_pred.append(i)
-                        else:
-                            val_pred.append(torch.argmax(val_output[index]).item())
-                val_labels += val_batch[2].tolist()
+                val_pred += torch.argmax(
+                    val_output, dim=-1
+                ).tolist()  # from logits argmax
+                val_labels += val_batch[1].tolist()
                 val_losses.append(val_loss.item())
 
             val_pred = np.array(val_pred)
@@ -194,18 +169,10 @@ class TextCNN(nn.Module):
                 test_loss = self.loss_fn(test_output, test_label).item()
                 progress_bar_test.update(1)
 
-                if self.multilabel == False:
-                    test_pred += torch.argmax(
-                        test_output, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(test_output, 3, dim=1)
-                    for index, i in enumerate(test_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            test_pred.append(i)
-                        else:
-                            test_pred.append(torch.argmax(test_output[index]).item())
-                test_labels += test_batch[2].tolist()
+                test_pred += torch.argmax(
+                    test_output, dim=-1
+                ).tolist()  # from logits argmax
+                test_labels += test_batch[1].tolist()
                 test_losses.append(test_loss)
             test_pred = np.array(test_pred)
             print(f"Finish testing. Test loss: {np.array(test_losses).mean()}")

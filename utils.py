@@ -198,7 +198,6 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
 
     if method in ["Pretrained", "RNN", "Ensemble", "TextCNN"]:
         # word
-        # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
         tokenizer = LongformerTokenizer.from_pretrained("allenai/longformer-base-4096")
         vocab = tokenizer.get_vocab()
         max_sentence_length = max(len(sentence) for sentence in df_all.iloc[:, 1])
@@ -212,6 +211,14 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
             for sentence in df.iloc[:, 1]
         ]
         print(np.array(input_ids).shape)  # (44802,637)
+        # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        # vocab = tokenizer.get_vocab()
+        # # max_sentence_length = max(len(sentence) for sentence in df_all.iloc[:, 1])
+        # input_ids = [
+        #     tokenizer.encode(sentence, add_special_tokens=True, padding="max_length")
+        #     for sentence in df.iloc[:, 1]
+        # ]
+        # print(np.array(input_ids).shape)  # (44802,637)
     elif method in ["LSTM"]:
         # spacy.cli.download("en_core_web_md")
         nlp_md = spacy.load("en_core_web_md")
@@ -275,6 +282,7 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
         elif task == "fake_news":
             labels = [0 if numeric2label[i] != "true" else 1 for i in labels]
 
+    input_ids, labels = shuffle(input_ids, labels, random_state=42)
     if method in ["Pretrained", "Ensemble"]:
         attention_masks = [[1] * len(input_id) for input_id in input_ids]
         dataset = TensorDataset(  # 44802
@@ -284,8 +292,9 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
         )
     elif method in ["RNN", "LSTM", "TextCNN"]:
         dataset = TensorDataset(torch.tensor(input_ids), torch.tensor(labels))  # 44802
+    # dataset = dataset.shuffle()
     dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size, num_workers=0)
-    print(next(iter(dataloader)))
+    # print(next(iter(dataloader)))
 
     if method == "Pretrained":
         return dataloader
@@ -321,7 +330,7 @@ def load_data_MT(batch_size=8):
         train_dataset,
         test_dataset,
         LANG_TOKEN_MAPPING,
-        max_seq_len
+        max_seq_len,
     )
 
 
@@ -651,7 +660,13 @@ def load_model(
 ):
     if task == "sentiment_analysis":
         if method == "Pretrained":
-            model = SA_Pretrained(method=method, device=device, lr=lr, epochs=epochs)
+            model = SA_Pretrained(
+                method=method,
+                device=device,
+                lr=lr,
+                epochs=epochs,
+                multilabel=multilabel,
+            )
         elif method == "RNN":
             model = SA_RNN(
                 method=method,
@@ -661,6 +676,7 @@ def load_model(
                 bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
             )
         elif method == "LSTM":
             model = SA_LSTM(
@@ -671,6 +687,7 @@ def load_model(
                 bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
             )
         elif method == "Ensemble":
             model = SA_Ensemble(
@@ -682,6 +699,7 @@ def load_model(
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
+                multilabel=multilabel,
             )
         elif method == "TextCNN":
             model = SA_TextCNN(
@@ -691,11 +709,17 @@ def load_model(
                 output_dim=output_dim,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
             )
     elif task == "intent_recognition":
         if method == "Pretrained":
             model = IR_Pretrained(
-                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+                method=method,
+                device=device,
+                lr=lr,
+                epochs=epochs,
+                grained=grained,
+                multilabel=multilabel,
             )
         elif method == "RNN":
             model = IR_RNN(
@@ -707,6 +731,7 @@ def load_model(
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
+                multilabel=multilabel,
             )
         elif method == "LSTM":
             model = IR_LSTM(
@@ -718,6 +743,7 @@ def load_model(
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
+                multilabel=multilabel,
             )
         elif method == "Ensemble":
             model = IR_Ensemble(
@@ -730,6 +756,7 @@ def load_model(
                 lr=lr,
                 alpha=alpha,
                 grained=grained,
+                multilabel=multilabel,
             )
         elif method == "TextCNN":
             model = IR_TextCNN(
@@ -740,6 +767,7 @@ def load_model(
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
+                multilabel=multilabel,
             )
     elif task == "emotion_classification":
         if method == "Pretrained":
@@ -759,6 +787,7 @@ def load_model(
                 bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
             )
         elif method == "LSTM":
             model = EC_LSTM(
@@ -769,6 +798,7 @@ def load_model(
                 bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
             )
         elif method == "Ensemble":
             model = EC_Ensemble(
@@ -780,6 +810,7 @@ def load_model(
                 epochs=epochs,
                 lr=lr,
                 alpha=alpha,
+                multilabel=multilabel,
             )
         elif method == "TextCNN":
             model = EC_TextCNN(
@@ -789,11 +820,17 @@ def load_model(
                 output_dim=output_dim,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
             )
     elif task == "fake_news":
         if method == "Pretrained":
             model = FN_Pretrained(
-                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+                method=method,
+                device=device,
+                lr=lr,
+                epochs=epochs,
+                grained=grained,
+                multilabel=multilabel,
             )
         elif method == "RNN":
             model = FN_RNN(
@@ -805,6 +842,7 @@ def load_model(
                 epochs=epochs,
                 lr=lr,
                 grained=grained,
+                multilabel=multilabel,
             )
         elif method == "LSTM":
             model = FN_LSTM(
@@ -815,6 +853,7 @@ def load_model(
                 bidirectional=bidirectional,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
                 grained=grained,
             )
         elif method == "Ensemble":
@@ -828,6 +867,7 @@ def load_model(
                 lr=lr,
                 alpha=alpha,
                 grained=grained,
+                multilabel=multilabel,
             )
         elif method == "TextCNN":
             model = FN_TextCNN(
@@ -837,12 +877,16 @@ def load_model(
                 output_dim=output_dim,
                 epochs=epochs,
                 lr=lr,
+                multilabel=multilabel,
                 grained=grained,
             )
     elif task == "spam_detection":
         if method == "Pretrained":
             model = SD_Pretrained(
-                method=method, device=device, lr=lr, epochs=epochs, grained=grained
+                method=method,
+                device=device,
+                lr=lr,
+                epochs=epochs,
             )
         elif method == "RNN":
             model = SD_RNN(

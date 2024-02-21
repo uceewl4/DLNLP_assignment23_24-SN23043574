@@ -299,4 +299,4 @@ def fake_news():
     df_all.to_csv("Datasets/preprocessed/fake_news/all.csv", index=False)
 
 
-fake_news()
+# fake_news()

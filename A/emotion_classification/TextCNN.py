@@ -106,12 +106,12 @@ class TextCNN(nn.Module):
                     ).tolist()  # from logits argmax
                 elif self.multilabel == True:
                     top_values, top_indices = torch.topk(train_output, 3, dim=1)
-                    for index, i in enumerate(train_batch[2].tolist()):
+                    for index, i in enumerate(train_batch[1].tolist()):
                         if i in top_indices[index]:
                             train_pred.append(i)
                         else:
                             train_pred.append(torch.argmax(train_output[index]).item())
-                train_labels += train_batch[2].tolist()
+                train_labels += train_batch[1].tolist()
 
             train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
@@ -152,12 +152,12 @@ class TextCNN(nn.Module):
                     ).tolist()  # from logits argmax
                 elif self.multilabel == True:
                     top_values, top_indices = torch.topk(val_output, 3, dim=1)
-                    for index, i in enumerate(val_batch[2].tolist()):
+                    for index, i in enumerate(val_batch[1].tolist()):
                         if i in top_indices[index]:
                             val_pred.append(i)
                         else:
                             val_pred.append(torch.argmax(val_output[index]).item())
-                val_labels += val_batch[2].tolist()
+                val_labels += val_batch[1].tolist()
                 val_losses.append(val_loss.item())
 
             val_pred = np.array(val_pred)
@@ -209,12 +209,12 @@ class TextCNN(nn.Module):
                     ).tolist()  # from logits argmax
                 elif self.multilabel == True:
                     top_values, top_indices = torch.topk(test_output, 3, dim=1)
-                    for index, i in enumerate(test_batch[2].tolist()):
+                    for index, i in enumerate(test_batch[1].tolist()):
                         if i in top_indices[index]:
                             test_pred.append(i)
                         else:
                             test_pred.append(torch.argmax(test_output[index]).item())
-                test_labels += test_batch[2].tolist()
+                test_labels += test_batch[1].tolist()
                 test_losses.append(test_loss)
             test_pred = np.array(test_pred)
             print(f"Finish testing. Test loss: {np.array(test_losses).mean()}")

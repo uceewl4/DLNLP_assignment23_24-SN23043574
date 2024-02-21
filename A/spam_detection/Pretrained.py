@@ -32,12 +32,12 @@ import torch.nn.functional as F
 
 
 class Pretrained(nn.Module):
-    def __init__(self, method, device, epochs=10, lr=1e-5, multilabel=False):
+    def __init__(self, method, device, epochs=10, lr=1e-5):
         super(Pretrained, self).__init__()
         self.method = method
         self.device = device
         self.num_class = 2
-        self.multilabel = multilabel
+
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
@@ -79,17 +79,10 @@ class Pretrained(nn.Module):
                 train_losses.append(train_loss.cpu().detach())
 
                 train_logits = train_output.logits
-                if self.multilabel == False:
-                    train_pred += torch.argmax(
-                        train_logits, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(train_logits, 3, dim=1)
-                    for index, i in enumerate(train_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            train_pred.append(i)
-                        else:
-                            train_pred.append(torch.argmax(train_logits[index]).item())
+
+                train_pred += torch.argmax(
+                    train_logits, dim=-1
+                ).tolist()  # from logits argmax
                 train_labels += train_batch[2].tolist()
 
             train_pred = np.array(train_pred)
@@ -130,17 +123,10 @@ class Pretrained(nn.Module):
                     )
                     val_loss = val_output.loss
                     val_logits = val_output.logits
-                    if self.multilabel == False:
-                        val_pred += torch.argmax(
-                            val_logits, dim=-1
-                        ).tolist()  # from logits argmax
-                    elif self.multilabel == True:
-                        top_values, top_indices = torch.topk(val_logits, 3, dim=1)
-                        for index, i in enumerate(val_batch[2].tolist()):
-                            if i in top_indices[index]:
-                                val_pred.append(i)
-                            else:
-                                val_pred.append(torch.argmax(val_logits[index]).item())
+
+                    val_pred += torch.argmax(
+                        val_logits, dim=-1
+                    ).tolist()  # from logits argmax
                     val_labels += val_batch[2].tolist()
 
                     val_losses.append(val_loss)
@@ -199,17 +185,9 @@ class Pretrained(nn.Module):
                 test_logits = test_output.logits
                 progress_bar_test.update(1)
 
-                if self.multilabel == False:
-                    test_pred += torch.argmax(
-                        test_logits, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(test_logits, 3, dim=1)
-                    for index, i in enumerate(test_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            test_pred.append(i)
-                        else:
-                            test_pred.append(torch.argmax(test_logits[index]).item())
+                test_pred += torch.argmax(
+                    test_logits, dim=-1
+                ).tolist()  # from logits argmax
                 test_labels += test_batch[2].tolist()
                 test_losses.append(test_loss)
             test_pred = np.array(test_pred)

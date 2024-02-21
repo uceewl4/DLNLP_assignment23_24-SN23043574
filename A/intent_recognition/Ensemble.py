@@ -45,13 +45,16 @@ class Ensemble(nn.Module):
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
-        self.pretrained = Pretrained(method=method, device=device, lr=lr, epochs=epochs)
+        self.pretrained = Pretrained(
+            method=method, device=device, lr=lr, epochs=epochs, grained=grained
+        )
         self.rnn = RNN(
             method=method,
             device=device,
             input_dim=input_dim,
             output_dim=output_dim,
-            bidrectional=bidirectional,
+            bidirectional=bidirectional,
+            grained=grained,
         )
         self.num_class = 20 if grained == "fine" else 2
         self.lr = lr
@@ -134,7 +137,7 @@ class Ensemble(nn.Module):
             val_min_pred, val_min_labels = [], []
             val_epoch_losses, val_epoch_accs = [], []
             progress_bar_val = tqdm(range(9 * len(val_dataloader)))
-            for alpha in np.arange(0.1, 1, 0.1):
+            for alpha in np.arange(0.1, 1, 0.25):
                 # self.model.to(device)
                 val_pred, val_labels = [], []
                 for val_batch in val_dataloader:
@@ -203,18 +206,18 @@ class Ensemble(nn.Module):
                     val_min_labels = val_labels
                     val_min_pred = val_pred
 
-            print("Finish training.")
+        print("Finish training.")
 
-            return (
-                train_epoch_losses,
-                train_epoch_accs,
-                val_epoch_losses,
-                val_epoch_accs,
-                train_pred,
-                val_min_pred,
-                train_labels,
-                val_min_labels,
-            )
+        return (
+            train_epoch_losses,
+            train_epoch_accs,
+            val_epoch_losses,
+            val_epoch_accs,
+            train_pred,
+            val_min_pred,
+            train_labels,
+            val_min_labels,
+        )
 
     def test(self, model, test_dataloader):
         print("Start testing......")
@@ -257,7 +260,7 @@ class Ensemble(nn.Module):
                     top_values, top_indices = torch.topk(total_test_prob, 3, dim=1)
                     for index, i in enumerate(test_batch[2].tolist()):
                         if i in top_indices[index]:
-                            total_test_prob.append(i)
+                            test_pred.append(i)
                         else:
                             test_pred.append(
                                 torch.argmax(total_test_prob[index]).item()

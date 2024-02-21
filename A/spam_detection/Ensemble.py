@@ -36,12 +36,10 @@ class Ensemble(nn.Module):
         epochs=10,
         lr=1e-5,
         alpha=0.5,
-        multilabel=False,
     ):
         super(Ensemble, self).__init__()
         self.method = method
         self.device = device
-        self.multilabel = multilabel
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     "bert-base-uncased", num_labels=4
         # )  # 4 class
@@ -51,7 +49,7 @@ class Ensemble(nn.Module):
             device=device,
             input_dim=input_dim,
             output_dim=output_dim,
-            bidrectional=bidirectional,
+            bidirectional=bidirectional,
         )
         self.num_class = 2
         self.lr = lr
@@ -100,19 +98,9 @@ class Ensemble(nn.Module):
                 progress_bar.update(1)
                 train_losses.append(total_train_loss.item())
 
-                if self.multilabel == False:
-                    train_pred += torch.argmax(
-                        total_train_prob, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(total_train_prob, 3, dim=1)
-                    for index, i in enumerate(train_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            train_pred.append(i)
-                        else:
-                            train_pred.append(
-                                torch.argmax(total_train_prob[index]).item()
-                            )
+                train_pred += torch.argmax(
+                    total_train_prob, dim=-1
+                ).tolist()  # from logits argmax
                 train_labels += train_batch[2].tolist()
             train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
@@ -133,7 +121,7 @@ class Ensemble(nn.Module):
             val_min_pred, val_min_labels = [], []
             val_epoch_losses, val_epoch_accs = [], []
             progress_bar_val = tqdm(range(9 * len(val_dataloader)))
-            for alpha in np.arange(0.1, 1, 0.1):
+            for alpha in np.arange(0.1, 1, 0.25):
                 # self.model.to(device)
                 val_pred, val_labels = [], []
                 for val_batch in val_dataloader:
@@ -164,19 +152,11 @@ class Ensemble(nn.Module):
                     total_val_loss.backward()
                     self.optimizer.step()  # Update model parameters
                     progress_bar_val.update(1)
-                    if self.multilabel == False:
-                        val_pred += torch.argmax(
-                            total_val_prob, dim=-1
-                        ).tolist()  # from logits argmax
-                    elif self.multilabel == True:
-                        top_values, top_indices = torch.topk(total_val_prob, 3, dim=1)
-                        for index, i in enumerate(val_batch[2].tolist()):
-                            if i in top_indices[index]:
-                                val_pred.append(i)
-                            else:
-                                val_pred.append(
-                                    torch.argmax(total_val_prob[index]).item()
-                                )
+
+                    val_pred += torch.argmax(
+                        total_val_prob, dim=-1
+                    ).tolist()  # from logits argmax
+
                     val_labels += val_batch[2].tolist()
                     val_losses.append(total_val_loss.item())
 
@@ -202,18 +182,18 @@ class Ensemble(nn.Module):
                     val_min_labels = val_labels
                     val_min_pred = val_pred
 
-            print("Finish training.")
+        print("Finish training.")
 
-            return (
-                train_epoch_losses,
-                train_epoch_accs,
-                val_epoch_losses,
-                val_epoch_accs,
-                train_pred,
-                val_min_pred,
-                train_labels,
-                val_min_labels,
-            )
+        return (
+            train_epoch_losses,
+            train_epoch_accs,
+            val_epoch_losses,
+            val_epoch_accs,
+            train_pred,
+            val_min_pred,
+            train_labels,
+            val_min_labels,
+        )
 
     def test(self, model, test_dataloader):
         print("Start testing......")
@@ -248,19 +228,11 @@ class Ensemble(nn.Module):
                 )
                 total_test_loss = self.loss_fn(total_test_prob, test_label)
                 progress_bar_test.update(1)
-                if self.multilabel == False:
-                    test_pred += torch.argmax(
-                        total_test_prob, dim=-1
-                    ).tolist()  # from logits argmax
-                elif self.multilabel == True:
-                    top_values, top_indices = torch.topk(total_test_prob, 3, dim=1)
-                    for index, i in enumerate(test_batch[2].tolist()):
-                        if i in top_indices[index]:
-                            total_test_prob.append(i)
-                        else:
-                            test_pred.append(
-                                torch.argmax(total_test_prob[index]).item()
-                            )
+
+                test_pred += torch.argmax(
+                    total_test_prob, dim=-1
+                ).tolist()  # from logits argmax
+
                 test_labels += test_batch[2].tolist()
                 test_losses.append(total_test_loss.item())
             test_pred = np.array(test_pred)
