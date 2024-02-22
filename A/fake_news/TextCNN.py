@@ -1,9 +1,4 @@
 import torch.nn as nn
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
 from torch.optim import Adam
 from tqdm.auto import tqdm
 import numpy as np

@@ -98,6 +98,7 @@ class Pretrained(nn.Module):
                 f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}"
             )
             train_epoch_accs.append(train_epoch_acc)
+            train_epoch_losses.append(train_epoch_loss)
             self.model.eval()
             # self.model.to(device)
 

@@ -9,11 +9,6 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
 from torch.optim import Adam
 from tqdm.auto import tqdm
 import numpy as np

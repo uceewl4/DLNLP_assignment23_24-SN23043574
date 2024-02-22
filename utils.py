@@ -9,34 +9,23 @@
 @Desc    :   This file is used for all utils function like visualization, data loading, model loading, etc.
 """
 import torch
-from torch import optim, nn
 from wordcloud import WordCloud
 from torch.utils.data import DataLoader, random_split
-import transformers
-import tensorflow_datasets as tfds
-from transformers import BertTokenizerFast, BertForQuestionAnswering
+from transformers import BertTokenizerFast
 from sklearn.metrics import f1_score
-from tqdm import tqdm
 
 # here put the import lib
 from datasets import load_dataset
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import torch
-from torch import optim
-from torch.nn import functional as F
-from transformers import AdamW, AutoModelForSeq2SeqLM, AutoTokenizer
-from transformers import get_linear_schedule_with_warmup
-from tqdm import tqdm_notebook
+from transformers import AutoTokenizer
 import os
 import json
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 import matplotlib.colors as mcolors
-from sklearn.decomposition import PCA
 from A.sentiment_analysis.Ensemble import Ensemble as SA_Ensemble
 from A.sentiment_analysis.LSTM import LSTM as SA_LSTM
 from A.sentiment_analysis.Pretrained import Pretrained as SA_Pretrained
@@ -65,7 +54,6 @@ from A.spam_detection.TextCNN import TextCNN as SD_TextCNN
 from sklearn.metrics import (
     confusion_matrix,
     roc_curve,
-    silhouette_score,
     accuracy_score,
     f1_score,
     precision_score,
@@ -73,14 +61,12 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
     auc,
 )
-import pprint
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import re
 from sklearn.model_selection import train_test_split
 import os
-from transformers import AutoTokenizer, DataCollatorWithPadding, LongformerTokenizer
+from transformers import AutoTokenizer, LongformerTokenizer
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -1024,47 +1010,6 @@ def get_metrics(task, y, pred):
     return result
 
 
-"""
-description: This function is used for visualizing dataset label distribution.
-param {*} task: task A or B
-param {*} data: npz data
-"""
-
-
-def visual4label(task, data):
-    fig, ax = plt.subplots(
-        nrows=1, ncols=3, figsize=(6, 3), subplot_kw=dict(aspect="equal"), dpi=600
-    )
-
-    for index, mode in enumerate(["train", "val", "test"]):
-        pie_data = [
-            np.count_nonzero(data[f"{mode}_labels"].flatten() == i)
-            for i in range(len(set(data[f"{mode}_labels"].flatten().tolist())))
-        ]
-        labels = [
-            f"label {i}"
-            for i in sorted(list(set(data[f"{mode}_labels"].flatten().tolist())))
-        ]
-        wedges, texts, autotexts = ax[index].pie(
-            pie_data,
-            autopct=lambda pct: f"{pct:.2f}%\n({int(np.round(pct/100.*np.sum(pie_data))):d})",
-            textprops=dict(color="w"),
-        )
-        if index == 2:
-            ax[index].legend(
-                wedges, labels, loc="center left", bbox_to_anchor=(1, 0, 0.5, 1)
-            )
-        size = 6 if task == "A" else 3
-        plt.setp(autotexts, size=size, weight="bold")
-        ax[index].set_title(mode)
-    plt.tight_layout()
-
-    if not os.path.exists("outputs/images/"):
-        os.makedirs("outputs/images/")
-    fig.savefig(f"outputs/images/label_distribution_task{task}.png")
-    plt.close()
-
-
 def visual4loss(task, method, train_loss, train_acc, val_loss, val_acc):
     plt.figure()
     plt.title(f"Loss for epochs of {method}")
@@ -1131,6 +1076,7 @@ def visual4auc(task, method, ytrain, yval, ytest, pred_train, pred_val, pred_tes
         "test": (ytest, pred_test),
     }
     colors = list(mcolors.TABLEAU_COLORS.keys())
+    fig = plt.figure(figsize=(15, 8))
     for index, (key, value) in enumerate(dictionary.items()):
         fpr, tpr, thre = roc_curve(
             value[0], value[1], pos_label=1, drop_intermediate=True
@@ -1142,18 +1088,18 @@ def visual4auc(task, method, ytrain, yval, ytest, pred_train, pred_val, pred_tes
             label="{}(AUC={:.3f})".format(key, auc(fpr, tpr)),
             color=mcolors.TABLEAU_COLORS[colors[index]],
         )  # draw each one
-    plt.plot([0, 1], [0, 1], "--", lw=1, color="grey")
-    plt.axis("square")
-    plt.xlim([0, 1])
-    plt.ylim([0, 1])
-    plt.xlabel("False Positive Rate", fontsize=10)
-    plt.ylabel("True Positive Rate", fontsize=10)
-    plt.title("ROC Curve", fontsize=10)
-    plt.legend(loc="lower right", fontsize=5)
+        plt.plot([0, 1], [0, 1], "--", lw=1, color="grey")
+        plt.axis("square")
+        plt.xlim([0, 1])
+        plt.ylim([0, 1])
+        plt.xlabel("False Positive Rate", fontsize=10)
+        plt.ylabel("True Positive Rate", fontsize=10)
+        plt.title("ROC Curve", fontsize=10)
+        plt.legend(loc="lower right", fontsize=5)
     if not os.path.exists(f"Outputs/{task}/metric_lines"):
         os.makedirs(f"Outputs/{task}/metric_lines")
-    plt.savefig(f"Outputs/{task}/metric_lines/{method}_auroc.png")
-    plt.show()
+    fig.savefig(f"Outputs/{task}/metric_lines/{method}_auroc.png")
+    plt.close()
 
 
 def visual4MT(task, losses):

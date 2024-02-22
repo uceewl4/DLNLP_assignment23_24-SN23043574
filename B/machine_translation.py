@@ -8,38 +8,12 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 """
 
 import torch.nn as nn
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
-from torch.optim import Adam
-from tqdm.auto import tqdm
 import numpy as np
-import torch
 
-from sklearn.metrics import accuracy_score
 import torch.nn as nn
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
-from torch.optim import Adam
-from tqdm.auto import tqdm
 import numpy as np
-import torch
-from datasets import load_dataset
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
-import torch
-from torch import optim
-from torch.nn import functional as F
-from transformers import AdamW, AutoModelForSeq2SeqLM, AutoTokenizer
-from transformers import get_linear_schedule_with_warmup
-from tqdm import tqdm_notebook
-import torch.nn.functional as F
+from transformers import AdamW, AutoModelForSeq2SeqLM
 
 
 class MT(nn.Module):

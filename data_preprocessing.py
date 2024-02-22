@@ -15,11 +15,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
-from sklearn.model_selection import train_test_split
 import os
-from transformers import AutoTokenizer, DataCollatorWithPadding
-import torch
-from torch.utils.data import DataLoader, TensorDataset
 
 
 def sentence_clean(sentence):

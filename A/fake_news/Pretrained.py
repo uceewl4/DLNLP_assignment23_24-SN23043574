@@ -8,9 +8,7 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 """
 
 import torch.nn as nn
-from torch.nn import CrossEntropyLoss
 from transformers import (
-    AutoModelForSequenceClassification,
     LongformerForSequenceClassification,
 )
 from torch.optim import Adam
@@ -18,16 +16,6 @@ from tqdm.auto import tqdm
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score
-import torch.nn as nn
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
-from torch.optim import Adam
-from tqdm.auto import tqdm
-import numpy as np
-import torch
 import torch.nn.functional as F
 
 
@@ -115,6 +103,7 @@ class Pretrained(nn.Module):
                 f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}"
             )
             train_epoch_accs.append(train_epoch_acc)
+            train_epoch_losses.append(train_epoch_loss)
             self.model.eval()
             # self.model.to(device)
 

@@ -235,6 +235,7 @@ if __name__ == "__main__":
                 method,
                 lr=args.lr,
                 epochs=args.epochs,
+                grained=args.grained,
                 multilabel=args.multilabel,
             )
         elif method in ["RNN", "TextCNN"]:
@@ -408,7 +409,7 @@ if __name__ == "__main__":
             )  # size (64,104)
         if (
             task in ["fake_news", "spam_detection", "intent_recognition"]
-            and args.grained == "coarse"
+            or args.grained == "coarse"
         ):
             visual4auc(
                 task, method, ytrain, yval, ytest, pred_train, pred_val, pred_test

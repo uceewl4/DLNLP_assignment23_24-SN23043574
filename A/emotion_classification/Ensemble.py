@@ -10,11 +10,6 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
 import torch.nn.functional as F
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
 from torch.optim import Adam
 from tqdm.auto import tqdm
 import numpy as np
@@ -131,8 +126,7 @@ class Ensemble(nn.Module):
 
             min_average_loss = float("inf")
             val_min_pred, val_min_labels = [], []
-            val_epoch_losses, val_epoch_accs = [], []
-            progress_bar_val = tqdm(range(9 * len(val_dataloader)))
+            progress_bar_val = tqdm(range(4 * len(val_dataloader)))
             for alpha in np.arange(0.1, 1, 0.25):
                 # self.model.to(device)
                 val_pred, val_labels = [], []
@@ -196,11 +190,13 @@ class Ensemble(nn.Module):
                             f"\nval loss: {val_epoch_loss}, acc: {val_epoch_acc}, best alpha: {self.alpha}"
                         )
                     )
-                    val_epoch_losses.append(val_epoch_loss)
-                    val_epoch_accs.append(val_epoch_acc)
                     min_average_loss = val_epoch_loss
                     val_min_labels = val_labels
                     val_min_pred = val_pred
+                    val_max_acc = val_epoch_acc
+
+            val_epoch_losses.append(min_average_loss)
+            val_epoch_accs.append(val_max_acc)
 
         print("Finish training.")
 

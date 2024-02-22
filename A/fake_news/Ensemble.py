@@ -135,8 +135,7 @@ class Ensemble(nn.Module):
 
             min_average_loss = float("inf")
             val_min_pred, val_min_labels = [], []
-            val_epoch_losses, val_epoch_accs = [], []
-            progress_bar_val = tqdm(range(9 * len(val_dataloader)))
+            progress_bar_val = tqdm(range(4 * len(val_dataloader)))
             for alpha in np.arange(0.1, 1, 0.25):
                 # self.model.to(device)
                 val_pred, val_labels = [], []
@@ -193,6 +192,7 @@ class Ensemble(nn.Module):
                     * 100,
                     4,
                 )
+
                 if val_epoch_loss <= min_average_loss:
                     self.alpha = alpha
                     print(
@@ -200,11 +200,13 @@ class Ensemble(nn.Module):
                             f"\nval loss: {val_epoch_loss}, acc: {val_epoch_acc}, best alpha: {self.alpha}"
                         )
                     )
-                    val_epoch_losses.append(val_epoch_loss)
-                    val_epoch_accs.append(val_epoch_acc)
                     min_average_loss = val_epoch_loss
                     val_min_labels = val_labels
                     val_min_pred = val_pred
+                    val_max_acc = val_epoch_acc
+
+            val_epoch_losses.append(min_average_loss)
+            val_epoch_accs.append(val_max_acc)
 
         print("Finish training.")
 
