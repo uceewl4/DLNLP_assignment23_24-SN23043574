@@ -62,7 +62,7 @@ st.markdown(
 # message and invocation of ChatOpenAI.
 # 3. Sentiment&Intent is designed for online analysis of sentiment and intent for a given sentence.
 # 4. Sentence analysis is designed for comprehensive analysis for given sentences from
-# NEM, POS tagging, co-reference resolution and depsndency parsing.
+# NER, POS tagging, co-reference resolution and depsndency parsing.
 # 5. Machine comprehension is designed as some implementable tools used commonly in our daily
 # life, including Question answering for passage comprehension, Text summarization, Machine translation and Semantic
 # textual similarity for essay similarity checking.

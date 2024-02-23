@@ -36,9 +36,9 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
     
 - **B**: codes for task B of 3 different scenarios
   - **machine_translation.py:**: task of machine translation
-  - **NER.py:**: task of NEM
+  - **NER.py:**: task of NER
   - **question_answering.py:**: task of question answering
-  - **ner_dataset.csv:**: dataset of NEM
+  - **ner_dataset.csv:**: dataset of NER
   - **train-v2.0.json:**: dataset of question answering
   - **nltk._upenn_tagset.txt:**: explanation of POS tagging
 
@@ -134,7 +134,7 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
 
 
 ### 3. Natural Language Processing Interative Tasks System -- NLPITS
-> Designed for users to integrate various NLP tools as a platform kit with sentiment & intent classification, sentence analysis of NEM, POS tagging, etc., machine comprehension like translation and text summarization, as well as story telling. The system is implemented with Streamlit package in Python as core design tool.
+> Designed for users to integrate various NLP tools as a platform kit with sentiment & intent classification, sentence analysis of NER, POS tagging, etc., machine comprehension like translation and text summarization, as well as story telling. The system is implemented with Streamlit package in Python as core design tool.
 
 ![img.png](main_page.png)
 ![img.png](img2.png)
@@ -165,7 +165,7 @@ Two projects are provided under this Github link. The first one is a project wit
 
   **<font color=#008000>Notice that the argument of pre_data must be set as True to download datasets and check data preprocessing initially. There are several other arguments which can be specified to select different model scenario. Default scenario is LR baseline for task A. You can specify the argument as follows:</font>**
 
-    --task: name of selected task, including sentiment_analysis, emotion_classification, spam detection, fake news detection, intent_recognition, MT, QA, NEM. 
+    --task: name of selected task, including sentiment_analysis, emotion_classification, spam detection, fake news detection, intent_recognition, MT, QA, NER. 
 
     <!-- --method: model selected, default LR. for ML baselines, specify related name as "LR", "SVM", etc. For customized networks, specify related name as "MLP", "CNN", "EnsembleNet", etc. For pretrained networks, specify pretrained model with classifier as "DenseNet201_LR", "VGG16_SVM", etc. For clustering method, specify related name as "KMeans".  -->
 

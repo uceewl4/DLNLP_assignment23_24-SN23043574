@@ -208,7 +208,7 @@ if __name__ == "__main__":
                 grained=args.grained,
             )
 
-    # task B: machine translation, question answering and NEM
+    # task B: machine translation, question answering and NER
     if task == "MT":
         (
             train_generator,

@@ -460,7 +460,7 @@ def load_data_QA(batch_size=8):
 
 def load_data_NER():
     """
-    description: This method is used to load data input for NEM.
+    description: This method is used to load data input for NER.
     The code refers to DLNLP lab 1.
     return {*}: data split and tags
     """
