@@ -1,11 +1,16 @@
+# -*- encoding: utf-8 -*-
 """
-Author: uceewl4 uceewl4@ucl.ac.uk
-Date: 2024-02-08 21:17:17
-LastEditors: uceewl4 uceewl4@ucl.ac.uk
-LastEditTime: 2024-02-08 21:26:11
-FilePath: /DLNLP_assignment23_24-SN23043574/A/sentiment_analysis/Pretrained.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+@File    :   Pretrained.py
+@Time    :   2024/02/23 17:23:21
+@Programme :  MSc Integrated Machine Learning Systems (TMSIMLSSYS01)
+@Module : ELEC0141: Deep Learning for Natural Language Processing
+@SN :   23043574
+@Contact :   uceewl4@ucl.ac.uk
+@Desc    :  This file is used for encapsulated all related methods and attributes for pretrained models
+for emotion classification.
 """
+
+# here put the import lib
 
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
@@ -17,18 +22,7 @@ from torch.optim import Adam
 from tqdm.auto import tqdm
 import numpy as np
 import torch
-
 from sklearn.metrics import accuracy_score
-import torch.nn as nn
-from torch.nn import CrossEntropyLoss
-from transformers import (
-    AutoModelForSequenceClassification,
-    LongformerForSequenceClassification,
-)
-from torch.optim import Adam
-from tqdm.auto import tqdm
-import numpy as np
-import torch
 import torch.nn.functional as F
 
 
@@ -39,9 +33,6 @@ class Pretrained(nn.Module):
         self.device = device
         self.num_class = 8
         self.multilabel = multilabel
-        # self.model = AutoModelForSequenceClassification.from_pretrained(
-        #     "bert-base-uncased", num_labels=4
-        # )  # 4 class
         self.model = LongformerForSequenceClassification.from_pretrained(
             "jpwahle/longformer-base-plagiarism-detection",
             num_labels=8,
@@ -54,6 +45,14 @@ class Pretrained(nn.Module):
         self.optimizer = Adam(self.model.parameters(), lr=self.lr)
 
     def train(self, train_dataloader, val_dataloader):
+        """
+        description: This is the method for training and validation process.
+        param {*} self
+        param {*} model
+        param {*} train_dataloader
+        param {*} val_dataloader
+        return {*}: results for training and validation
+        """
         print("Start training......")
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
@@ -68,21 +67,22 @@ class Pretrained(nn.Module):
                     F.one_hot(train_batch[2], num_classes=self.num_class)
                     .type(torch.float)
                     .to(self.device)
-                )  # (8,20)
+                )
 
-                self.optimizer.zero_grad()  # Zero the gradients
+                self.optimizer.zero_grad()
                 train_output = self.model(
                     train_input_ids,
                     attention_mask=train_attention_mask,
                     labels=train_label,
                 )
                 train_loss = train_output.loss
-                train_loss.backward()  # Compute the gradient of the loss
-                self.optimizer.step()  # Update model parameters
+                train_loss.backward()
+                self.optimizer.step()
                 progress_bar.update(1)
                 train_losses.append(train_loss.cpu().detach())
-
                 train_logits = train_output.logits
+
+                # get predictions
                 if self.multilabel == False:
                     train_pred += torch.argmax(
                         train_logits, dim=-1
@@ -110,17 +110,16 @@ class Pretrained(nn.Module):
             )
             train_epoch_accs.append(train_epoch_acc)
             train_epoch_losses.append(train_epoch_loss)
-            self.model.eval()
-            # self.model.to(device)
 
+            # validation
+            self.model.eval()
             val_pred, val_labels = [], []
             progress_bar_val = tqdm(range(len(val_dataloader)))
 
             with torch.no_grad():
                 for val_batch in val_dataloader:
                     val_losses = []
-                    # Move batch data to the same device as the model
-                    val_input_ids = val_batch[0].to(self.device)  # id tokens
+                    val_input_ids = val_batch[0].to(self.device)
                     val_attention_mask = val_batch[1].to(self.device)
                     val_label = (
                         F.one_hot(val_batch[2], num_classes=self.num_class)
@@ -135,6 +134,8 @@ class Pretrained(nn.Module):
                     )
                     val_loss = val_output.loss
                     val_logits = val_output.logits
+
+                    # get predictions
                     if self.multilabel == False:
                         val_pred += torch.argmax(
                             val_logits, dim=-1
@@ -147,7 +148,6 @@ class Pretrained(nn.Module):
                             else:
                                 val_pred.append(torch.argmax(val_logits[index]).item())
                     val_labels += val_batch[2].tolist()
-
                     val_losses.append(val_loss)
                     progress_bar_val.update(1)
 
@@ -178,16 +178,20 @@ class Pretrained(nn.Module):
         )
 
     def test(self, test_dataloader):
+        """
+        description: This is the testing process for the methods
+        param {*} self
+        param {*} test_dataloader
+        return {*}: test results
+        """
         print("Start testing......")
         self.model.eval()
-        # self.model.to(device)
         test_losses, test_pred, test_labels = [], [], []
         progress_bar_test = tqdm(range(len(test_dataloader)))
 
         with torch.no_grad():
             for test_batch in test_dataloader:
-                # Move batch data to the same device as the model
-                test_input_ids = test_batch[0].to(self.device)  # id tokens
+                test_input_ids = test_batch[0].to(self.device)
                 test_attention_mask = test_batch[1].to(self.device)
                 test_label = (
                     F.one_hot(test_batch[2], num_classes=self.num_class)
@@ -204,6 +208,7 @@ class Pretrained(nn.Module):
                 test_logits = test_output.logits
                 progress_bar_test.update(1)
 
+                # get prediction
                 if self.multilabel == False:
                     test_pred += torch.argmax(
                         test_logits, dim=-1
@@ -217,6 +222,7 @@ class Pretrained(nn.Module):
                             test_pred.append(torch.argmax(test_logits[index]).item())
                 test_labels += test_batch[2].tolist()
                 test_losses.append(test_loss)
+
             test_pred = np.array(test_pred)
             print(f"\nFinish testing. Test loss: {torch.stack(test_losses).mean()}")
 

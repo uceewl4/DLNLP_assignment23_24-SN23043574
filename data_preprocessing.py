@@ -1,15 +1,18 @@
+# -*- encoding: utf-8 -*-
 """
-Author: uceewl4 uceewl4@ucl.ac.uk
-Date: 2024-02-08 15:42:41
-LastEditors: uceewl4 uceewl4@ucl.ac.uk
-LastEditTime: 2024-02-09 20:19:58
-FilePath: /DLNLP_assignment23_24-SN23043574/data_preprocessing.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+@File    :   data_preprocessing.py
+@Time    :   2024/02/23 15:36:52
+@Programme :  MSc Integrated Machine Learning Systems (TMSIMLSSYS01)
+@Module : ELEC0141: Deep Learning for Natural Language Processing
+@SN :   23043574
+@Contact :   uceewl4@ucl.ac.uk
+@Desc    :   This file is used for data preprocessing from raw datasets of all tasks.
 """
+
+# here put the import lib
 
 import json
 from sklearn.utils import shuffle
-import pprint
 import random
 import numpy as np
 import pandas as pd
@@ -19,24 +22,28 @@ import os
 
 
 def sentence_clean(sentence):
-    # remove backslash-apostrophe
-    sentence = re.sub("'", "", sentence)  # replace
-    # remove everything except alphabets
-    sentence = re.sub("[^a-zA-Z]", " ", sentence)
-    # remove whitespaces
-    sentence = " ".join(sentence.split())
-    # remove white space in start and end
-    sentence = re.sub(r"^\s+", "", sentence).lstrip()
-    # remove special characters
-    sentence = re.sub(r"[-()\"#/@;:<>{}=~|.?,]", "", sentence)
-    # convert text to lowercase
-    sentence = sentence.lower()
+    """
+    description: This method is used for cleaning the sentences.
+    Notice that this method refers to DLNLP lab 1.
+    param {*} sentence: sentences to be cleaned
+    return {*}: new sentence after cleaning
+    """
+    sentence = re.sub("'", "", sentence)  # backslash-apostrophe
+    sentence = re.sub("[^a-zA-Z]", " ", sentence)  # everything except alphabets
+    sentence = " ".join(sentence.split())  # whitespaces
+    sentence = re.sub(r"^\s+", "", sentence).lstrip()  # white space in start and end
+    sentence = re.sub(r"[-()\"#/@;:<>{}=~|.?,]", "", sentence)  # special characters
+    sentence = sentence.lower()  # lowercase
 
     return sentence
 
 
-# 1200, 400, 400
 def sentiment_preprocessing():
+    """
+    description: This method is used for getting preprocessed data from raw dataset
+    for sentiment preprocessing, which splits the dataset into train/validation/testing
+    of 1200/400/400.
+    """
     df_1 = pd.read_csv(
         "Datasets/raw/sentiment_analysis/twitter_training.csv",
         names=["tweet id", "entity", "sentiment", "tweet content"],
@@ -50,19 +57,20 @@ def sentiment_preprocessing():
         .drop(columns=["tweet id", "entity"])
         .dropna()
     )
-    # print(df)
+
+    # label distribution
     fig = plt.figure()
     df["sentiment"].value_counts().plot.bar(
         rot=0, figsize=(8, 5), grid=True, align="center"
     )
     fig.savefig("Outputs/data_visualization/sentiment.png")
 
-    print(df)
     df["tweet content"] = (
         df["tweet content"].astype(str).apply(lambda x: sentence_clean(x))
     )
     df = df[df["tweet content"] != ""].dropna(subset=["tweet content"])
 
+    # dataset split
     # 1200/4 300,300,300,300
     # 400/4 100 100 100 100
     train_index, val_index, test_index = [], [], []
@@ -76,7 +84,7 @@ def sentiment_preprocessing():
         index = list(df[df["sentiment"] == i].index)
         drop_index = random.sample(index, 100)
         val_index += drop_index
-        df = df.drop(drop_index, axis=0)  # delete the sample case
+        df = df.drop(drop_index, axis=0)
 
         index = list(df[df["sentiment"] == i].index)
         drop_index = random.sample(index, 100)
@@ -89,6 +97,7 @@ def sentiment_preprocessing():
     df_test = shuffle(df_all.loc[test_index, :])
     df_all = shuffle(df_all.loc[all_index, :])
 
+    # load into preprocessed files
     if not os.path.exists("Datasets/preprocessed/sentiment_analysis"):
         os.makedirs("Datasets/preprocessed/sentiment_analysis")
     df_all.to_csv("Datasets/preprocessed/sentiment_analysis/all.csv", index=False)
@@ -97,10 +106,12 @@ def sentiment_preprocessing():
     df_test.to_csv("Datasets/preprocessed/sentiment_analysis/test.csv", index=False)
 
 
-# sentiment_preprocessing()
-
-
 def emotion_preprocessing():
+    """
+    description: This method is used for getting preprocessed data from raw dataset
+    for emotion classification, which splits the dataset into train/validation/testing
+    of 1200/400/400.
+    """
     folder = "Datasets/raw/emotion_classification"
     for index, file in enumerate(os.listdir(folder)):
         data = []
@@ -116,11 +127,10 @@ def emotion_preprocessing():
             {"emotion": emotion, "utterance": utterance},
             columns=["emotion", "utterance"],
         )
-        print(df)
-
         df["utterance"] = df["utterance"].astype(str).apply(lambda x: sentence_clean(x))
         df = df[df["utterance"] != ""].dropna(subset=["utterance"])
 
+        # dataset split
         # 1200  150
         # 400   50
         df_tmp = df.copy()
@@ -146,27 +156,29 @@ def emotion_preprocessing():
             f"Datasets/preprocessed/emotion_classification/{file.split('.')[0].split('_')[1]}.csv",
             index=False,
         )
+
+    # label distribution
     fig = plt.figure()
     df_all["emotion"].value_counts().plot.bar(
         rot=0, figsize=(8, 5), grid=True, align="center"
     )
+
     df_all = shuffle(df_all)
     fig.savefig("Outputs/data_visualization/emotion.png")
     df_all.to_csv("Datasets/preprocessed/emotion_classification/all.csv", index=False)
 
 
-# emotion_preprocessing()
-
-
 def intent_recognition():
+    """
+    description: This method is used for getting preprocessed data from raw dataset
+    for intent recognition, which splits the dataset into train/validation/testing.
+    """
     folder = "Datasets/raw/intent_recognition"
     for index, file in enumerate(os.listdir(folder)):
         df = pd.read_csv(
             os.path.join(folder, file),
             sep="\t",
         )
-        print(df)
-
         df["text"] = df["text"].astype(str).apply(lambda x: sentence_clean(x))
         df = (
             df[df["text"] != ""]
@@ -174,7 +186,6 @@ def intent_recognition():
             .drop(columns=["season", "episode", "clip"])
         )
         df = pd.DataFrame(df, columns=["label", "text"])
-        print(df)
 
         if index == 0:
             df_all = df
@@ -186,6 +197,8 @@ def intent_recognition():
             f"Datasets/preprocessed/intent_recognition/{file.split('.')[0]}.csv",
             index=False,
         )
+
+    # label distribution
     fig = plt.figure()
     df_all["label"].value_counts().plot.bar(
         rot=0, figsize=(20, 5), grid=True, align="center"
@@ -194,10 +207,12 @@ def intent_recognition():
     df_all.to_csv("Datasets/preprocessed/intent_recognition/all.csv", index=False)
 
 
-# intent_recognition()
-
-
 def spam_detection():
+    """
+    description: This method is used for getting preprocessed data from raw dataset
+    for spam detection, which splits the dataset into train/validation/testing
+    of 1200/400/400.
+    """
     df = pd.read_csv(
         "Datasets/raw/spam_detection/spam.csv", encoding="ISO-8859-1"
     ).iloc[:, :2]
@@ -209,6 +224,7 @@ def spam_detection():
     )
     fig.savefig("Outputs/data_visualization/spam.png")
 
+    # dataset split
     # 1200/2 600,600
     # 400/2 200 200
     train_index, val_index, test_index = [], [], []
@@ -224,7 +240,7 @@ def spam_detection():
         index = list(df[df["label"] == i].index)
         drop_index = index if len(index) < 200 else random.sample(index, 200)
         val_index += drop_index
-        df = df.drop(drop_index, axis=0)  # delete the sample case
+        df = df.drop(drop_index, axis=0)
 
         index = list(df[df["label"] == i].index)
         drop_index = index if len(index) < 200 else random.sample(index, 200)
@@ -237,6 +253,7 @@ def spam_detection():
     df_test = shuffle(df_all.loc[test_index, :])
     df_all = shuffle(df_all.loc[all_index, :])
 
+    # load into files
     if not os.path.exists("Datasets/preprocessed/spam_detection"):
         os.makedirs("Datasets/preprocessed/spam_detection")
     df_all.to_csv("Datasets/preprocessed/spam_detection/all.csv", index=False)
@@ -245,10 +262,12 @@ def spam_detection():
     df_test.to_csv("Datasets/preprocessed/spam_detection/test.csv", index=False)
 
 
-# spam_detection()
-
-
 def fake_news():
+    """
+    description: This method is used for getting preprocessed data from raw dataset
+    for fake news detection, which splits the dataset into train/validation/testing
+    of 1200/400/400.
+    """
     folder = "Datasets/raw/fake_news"
     for index, file in enumerate(os.listdir(folder)):
         df = pd.read_csv(
@@ -286,6 +305,8 @@ def fake_news():
             f"Datasets/preprocessed/fake_news/{file.split('.')[0]}.csv",
             index=False,
         )
+
+    # label distribution
     fig = plt.figure()
     df_all["label"].value_counts().plot.bar(
         rot=0, figsize=(20, 5), grid=True, align="center"
@@ -295,4 +316,12 @@ def fake_news():
     df_all.to_csv("Datasets/preprocessed/fake_news/all.csv", index=False)
 
 
-# fake_news()
+def data_preprocess():
+    """
+    description: This method includes all data preprocessing methods involved.
+    """
+    sentiment_preprocessing()
+    emotion_preprocessing()
+    intent_recognition()
+    spam_detection()
+    fake_news()

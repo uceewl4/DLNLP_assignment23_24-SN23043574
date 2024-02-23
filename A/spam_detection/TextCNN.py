@@ -1,3 +1,17 @@
+# -*- encoding: utf-8 -*-
+"""
+@File    :   TextCNN.py
+@Time    :   2024/02/23 18:48:02
+@Programme :  MSc Integrated Machine Learning Systems (TMSIMLSSYS01)
+@Module : ELEC0141: Deep Learning for Natural Language Processing
+@SN :   23043574
+@Contact :   uceewl4@ucl.ac.uk
+@Desc    :  This file is used for encapsulated all related methods and attributes for text CNN
+for emotion classification. The code refers to https://www.youtube.com/watch?v=8t0T9iF4TDs.
+"""
+
+# here put the import lib
+
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from transformers import (
@@ -22,6 +36,7 @@ class TextCNN(nn.Module):
         self.device = device
         self.filters_sizes = [3, 4, 5]
         self.num_class = 2
+
         self.embedding = nn.Embedding(input_dim, output_dim)
         self.convs = nn.ModuleList(
             [
@@ -31,7 +46,6 @@ class TextCNN(nn.Module):
                 for fs in self.filters_sizes
             ]
         )
-
         self.fc = nn.Linear(len(self.filters_sizes) * n_filters, self.num_class)
         self.dropout = nn.Dropout(0.3)
 
@@ -40,30 +54,32 @@ class TextCNN(nn.Module):
         self.epochs = epochs
 
     def forward(self, x):
-        embedded = self.embedding(x)
-
-        # embedded = [batch size, sent len, emb dim]
-
+        embedded = self.embedding(x)  # [batch size, sent len, emb dim]
         embedded = embedded.unsqueeze(1)
-
-        # embedded = [batch size, 1, sent len, emb dim]
-
-        conved = [F.relu(conv(embedded)).squeeze(3) for conv in self.convs]
-
-        # conved_n = [batch size, n_filters, sent len - filter_sizes[n] + 1]
-
-        pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved]
-
-        # pooled_n = [batch size, n_filters]
-
-        cat = self.dropout(torch.cat(pooled, dim=1))
+        conved = [
+            F.relu(conv(embedded)).squeeze(3) for conv in self.convs
+        ]  # convolution, [batch size, 1, sent len, emb dim]
+        pooled = [
+            F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved
+        ]  # pooling, [batch size, n_filters, sent len - filter_sizes[n] + 1]
+        cat = self.dropout(
+            torch.cat(pooled, dim=1)
+        )  # concatenation, [batch size, n_filters]
         return self.fc(cat)
 
     def train(self, model, train_dataloader, val_dataloader):
+        """
+        description: This is the method for training and validation process.
+        param {*} self
+        param {*} model
+        param {*} train_dataloader
+        param {*} val_dataloader
+        return {*}: results for training and validation
+        """
         self.optimizer = Adam(model.parameters(), lr=self.lr)
         model.to(self.device)
         print("Start training......")
-        # model.train()
+
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
 
@@ -71,17 +87,18 @@ class TextCNN(nn.Module):
             progress_bar = tqdm(range(len(train_dataloader)))
             train_losses, train_pred, train_labels = [], [], []
             for step, train_batch in enumerate(train_dataloader):
-                train_input_ids = train_batch[0].to(self.device)  # id tokens  8,195
-                train_label = train_batch[1].to(self.device)  # 64  8
+                train_input_ids = train_batch[0].to(self.device)
+                train_label = train_batch[1].to(self.device)
 
-                self.optimizer.zero_grad()  # Zero the gradients
-                train_output = model(train_input_ids)  # 8,8
+                self.optimizer.zero_grad()
+                train_output = model(train_input_ids)
                 train_loss = self.loss_fn(train_output, train_label)
-                train_loss.backward()  # Compute the gradient of the loss
-                self.optimizer.step()  # Update model parameters
+                train_loss.backward()
+                self.optimizer.step()
                 progress_bar.update(1)
                 train_losses.append(train_loss.item())
 
+                # get prediction
                 train_pred += torch.argmax(
                     train_output, dim=-1
                 ).tolist()  # from logits argmax
@@ -102,22 +119,20 @@ class TextCNN(nn.Module):
                 f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}"
             )
 
-            # model.eval()
-            # self.model.to(device)
+            # validation
             val_pred, val_labels = [], []
             progress_bar_val = tqdm(range(len(val_dataloader)))
 
             for val_batch in val_dataloader:
                 val_losses = []
-                # Move batch data to the same device as the model
-                val_input_ids = val_batch[0].to(self.device)  # id tokens
+                val_input_ids = val_batch[0].to(self.device)
                 val_label = val_batch[1].to(self.device)
 
                 self.optimizer.zero_grad()
                 val_output = model(val_input_ids)
                 val_loss = self.loss_fn(val_output, val_label)
                 val_loss.backward()
-                self.optimizer.step()  # Update model parameters
+                self.optimizer.step()
                 progress_bar_val.update(1)
 
                 val_pred += torch.argmax(
@@ -136,8 +151,6 @@ class TextCNN(nn.Module):
             print(f"\nval loss: {val_epoch_loss}, acc: {val_epoch_acc}")
             val_epoch_losses.append(val_epoch_loss)
             val_epoch_accs.append(val_epoch_acc)
-            print(val_epoch_losses)
-            print(val_epoch_accs)
 
         print("Finish training.")
 
@@ -153,15 +166,19 @@ class TextCNN(nn.Module):
         )
 
     def test(self, model, test_dataloader):
+        """
+        description: This is the testing process for the methods
+        param {*} self
+        param {*} model
+        param {*} test_dataloader
+        return {*}: test results
+        """
         print("Start testing......")
-        # model.eval()
-        # self.model.to(device)
         test_losses, test_pred, test_labels = [], [], []
         progress_bar_test = tqdm(range(len(test_dataloader)))
 
         with torch.no_grad():
             for test_batch in test_dataloader:
-                # Move batch data to the same device as the model
                 test_input_ids = test_batch[0].to(self.device)  # id tokens
                 test_label = test_batch[1].to(self.device)
 
@@ -174,6 +191,7 @@ class TextCNN(nn.Module):
                 ).tolist()  # from logits argmax
                 test_labels += test_batch[1].tolist()
                 test_losses.append(test_loss)
+
             test_pred = np.array(test_pred)
             print(f"Finish testing. Test loss: {np.array(test_losses).mean()}")
 

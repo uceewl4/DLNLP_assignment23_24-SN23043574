@@ -1,4 +1,3 @@
-# here put the import lib
 import re
 from transformers import pipeline
 from spacy_streamlit import visualize_spans
@@ -18,17 +17,10 @@ from transformers import (
     LongformerForSequenceClassification,
     LongformerTokenizer,
 )
-
-# from dotenv import load_dotenv
 import os
-
 from langchain.chat_models import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
-from A.intent_recognition.Pretrained import Pretrained as IR_Pretrained
-
-
-# rcoreference resolution
 import spacy
 import spacy_experimental
 import os
@@ -37,8 +29,6 @@ from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Config
 import sentencepiece
 import sacremoses
 import requests
-
-# import cv2
 import streamlit as st
 import annotated_text
 from annotated_text import annotated_text
@@ -66,14 +56,20 @@ st.markdown(
 )
 
 
-#     There are four main columns in the sidebar:
-#     1. Welcome section is functioned as guidelines for new users to learn how to use this system.
-#     2. Diagnosis section is the critical part where two kinds of digital diagnosis are realized as Pneumonia diagnosis and CRC diagnosis
-#     3. Feedback section for radiologists to analyze digital diagnostic result and give consistent advice.
-#         It also includes a survey template for patients to provide additional health condition information like frequency of coughing,
-#         weight loss, etc., for diagnosis integrity. The diagnostic advice will be sent automatically to patients' mailbox with smtplib SMTP.
-#     4. Help section: users can send suggestions and complaints for DDI system through automatical emails.
-#
+# There are 7 main columns in the sidebar:
+# 1. Welcome is designed to give basic guidelines and instructions for new users of the system
+# 2. Chatbot is a real-time com-munication frame like ChatGPT, where users can input message at sidebar and get interactive dialogue by stored session
+# message and invocation of ChatOpenAI.
+# 3. Sentiment&Intent is designed for online analysis of sentiment and intent for a given sentence.
+# 4. Sentence analysis is designed for comprehensive analysis for given sentences from
+# NEM, POS tagging, co-reference resolution and depsndency parsing.
+# 5. Machine comprehension is designed as some implementable tools used commonly in our daily
+# life, including Question answering for passage comprehension, Text summarization, Machine translation and Semantic
+# textual similarity for essay similarity checking.
+# 6. Story telling includes two parts of image to text and text to story.
+# 7. Help section is designed for user to provide suggestion for NLPITS developers where messages will be
+# sent automatically by email.
+
 with st.sidebar:  # sidebar of the system, NLP interactive tasks system NLPITS
     choose = option_menu(
         "NLPITS",
@@ -197,14 +193,13 @@ if choose == "Welcome":  # instruction page
             + "contribution."
         )
 
-# diagnosis
+# chatbot
 elif choose == "Chatbot":
     chat = ChatOpenAI(
         openai_api_key="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"
     )
 
-    # initialize message history
-    if "messages" not in st.session_state:
+    if "messages" not in st.session_state:  # message history
         st.session_state.messages = [
             SystemMessage(content="You are a helpful assistant.")
         ]
@@ -217,14 +212,14 @@ elif choose == "Chatbot":
                 response = chat(st.session_state.messages)
             st.session_state.messages.append(AIMessage(content=response.content))
 
-    # display message history
     messages = st.session_state.get("messages", [])
     for i, msg in enumerate(messages[1:]):
         if i % 2 == 0:
             message(msg.content, is_user=True, key=str(i) + "_user")
         else:
             message(msg.content, is_user=False, key=str(i) + "_ai")
-# diagnosis
+
+# sentiment and intent
 elif choose == "Sentiment&Intent":
     task = option_menu(
         None,
@@ -233,9 +228,8 @@ elif choose == "Sentiment&Intent":
         default_index=0,
         orientation="horizontal",
     )
-    if task == "Sentiment classification":
-        # image uploaded by patients
 
+    if task == "Sentiment classification":
         input = st.text_input("Please input your sentiment sentence")
         if input != "":
             with st.spinner("Wait for it..."):
@@ -254,61 +248,6 @@ elif choose == "Sentiment&Intent":
                 st.info("Your sentiment is neutral", icon="😐")
 
     elif task == "Intent recognition":
-        # gpu version
-        # input = st.text_input("Please input your sentence")
-        # with st.spinner("Wait for it..."):
-        #     model = IR_Pretrained(
-        #         method="Pretrained",
-        #         device="cpu",
-        #         lr=0.0001,
-        #         epochs=10,
-        #         grained="fine",
-        #         multilabel=False,
-        #     )
-        #     model.model.load_state_dict(
-        #         torch.load("Outputs/intent_recognition/fine_pretrained.pt")
-        #     )
-        #     tokenizer = LongformerTokenizer.from_pretrained(
-        #         "allenai/longformer-base-4096"
-        #     )
-        #     input_ids = tokenizer.encode(
-        #         input,
-        #         add_special_tokens=True,
-        #         padding="max_length",
-        #     )
-        #     attention_mask = [1] * len(input_ids)
-        #     output_logits = model.model(
-        #         input_ids,
-        #         attention_mask=attention_mask,
-        #     )
-        #     pred = torch.argmax(output_logits, dim=-1).item()  # from logits argmax
-        #     labels = [
-        #         "Complain",
-        #         "Praise",
-        #         "Apologize",
-        #         "Thank",
-        #         "Criticize",
-        #         "Care",
-        #         "Agree",
-        #         "Taunt",
-        #         "Flaunt",
-        #         "Oppose",
-        #         "Joke",
-        #         "Inform",
-        #         "Advise",
-        #         "Arrange",
-        #         "Introduce",
-        #         "Comfort",
-        #         "Leave",
-        #         "Prevent",
-        #         "Greet",
-        #         "Ask for help",
-        #     ]
-        #     label_map = {index: i for index, i in enumerate(labels)}
-        #     res = label_map[pred]
-        # if res != "":
-        #     st.success(f"Your intent is {res}")
-
         # cpu version
         input = st.text_input("Please input your sentence")
         with st.spinner("Wait for it..."):
@@ -319,12 +258,13 @@ elif choose == "Sentiment&Intent":
         if input != "":
             st.success(f"Your sentiment is {res}")
 
-# diagnosis
+# sentence analysis
 elif choose == "Sentence analysis":
     tab1, tab2, tab3, tab4 = st.tabs(
         ["NER", "POS tagging", "Coreference resolution", "Dependency parsing"]
     )
-    with tab1:  # NER
+
+    with tab1:
         text = st.text_area("Text to analyze", key="NER")
         with st.spinner("Wait for it..."):
             nlp = spacy.load("en_core_web_sm")
@@ -345,7 +285,7 @@ elif choose == "Sentence analysis":
                 for index, i in enumerate(doc):
                     if ":" in i:
                         st.write(i)
-
+    # # version compatibility
     # with tab3:
     #     # python3 -m spacy download en_core_web_sm
     #     text = st.text_area("Text to analyze", key="tab3")
@@ -374,6 +314,7 @@ elif choose == "Sentence analysis":
     #         dep_svg = displacy.render(doc, style="dep", jupyter=False)
     #     st.image(dep_svg, use_column_width=True)
 
+# machine comprehension
 elif choose == "Machine comprehension":
     task = option_menu(
         None,
@@ -387,9 +328,8 @@ elif choose == "Machine comprehension":
         default_index=0,
         orientation="horizontal",
     )
-    if task == "Question answering":
-        # image uploaded by patients
 
+    if task == "Question answering":
         passage = st.text_area("Please input your passage")
         question = st.text_input("Please input your question")
         if passage != "" and question != "":
@@ -419,23 +359,7 @@ elif choose == "Machine comprehension":
             res = st.text_area("Summary", summary, key="summary")
 
     elif task == "Machine translation":
-        # machine translation
-
         col1, col2 = st.columns(2)
-        # with col1:
-        #     la_from = st.selectbox(
-        #         "from", tuple(sorted(list(googletrans.LANGUAGES.keys())))
-        #     )
-        #     original = st.text_area("Please input your sentences", height=600)
-        # with col2:
-        #     la_dest = st.selectbox(
-        #         "dest", tuple(sorted(list(googletrans.LANGUAGES.keys())))
-        #     )
-        #     with st.spinner("Wait for it..."):
-        #         if original != "":
-        #             translator = googletrans.Translator()
-        #             translate = translator.translate(original, dest=str(la_dest))
-        #             res = st.text_area("Translation", translate.text, height=600)
         with col1:
             la_from = st.selectbox("from", tuple(["Chinese", "English"]))
             original = st.text_area("Please input your sentences", height=600)
@@ -461,7 +385,6 @@ elif choose == "Machine comprehension":
         col1, col2 = st.columns(2)
         with col1:
             corpus = st.text_area("Please input your essay", height=400)
-            print(corpus)
         with col2:
             sentence = st.text_area("Please input your sentence", height=100)
             with st.spinner("Wait for it..."):
@@ -481,6 +404,7 @@ elif choose == "Machine comprehension":
                             + "\n"
                         )
 
+# story telling
 elif choose == "Story telling":
     task = option_menu(
         None,
@@ -489,19 +413,18 @@ elif choose == "Story telling":
         default_index=0,
         orientation="horizontal",
     )
+
     if task == "Image to text":
         uploaded_image = st.file_uploader(
             "Choose an image for captioning.", accept_multiple_files=False
         )
 
         if uploaded_image != None:
-            # download
             st.download_button(
                 f"Download {uploaded_image.name}", uploaded_image, mime="image/JPG"
             )
             # convert to image and store it
-            bytes_data = uploaded_image.getvalue()  # To read file as bytes
-            # print(bytes_data)
+            bytes_data = uploaded_image.getvalue()  # to read file as bytes
             bytes_stream = BytesIO(bytes_data)  # convert bytes into stream
             user_img = Image.open(bytes_stream)
             imgByteArr = BytesIO()
@@ -565,6 +488,7 @@ elif choose == "Help":
     st.title("Help")
     with st.form("help"):
         col1, col2 = st.columns(2)
+
         with col1:
             st.text("\n")
             st.markdown("**Official email address:**")

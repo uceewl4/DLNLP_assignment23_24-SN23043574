@@ -1,11 +1,16 @@
+# -*- encoding: utf-8 -*-
 """
-Author: uceewl4 uceewl4@ucl.ac.uk
-Date: 2024-02-08 21:17:17
-LastEditors: uceewl4 uceewl4@ucl.ac.uk
-LastEditTime: 2024-02-08 21:26:11
-FilePath: /DLNLP_assignment23_24-SN23043574/A/sentiment_analysis/Pretrained.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+@File    :   Ensemble.py
+@Time    :   2024/02/23 17:10:43
+@Programme :  MSc Integrated Machine Learning Systems (TMSIMLSSYS01)
+@Module : ELEC0141: Deep Learning for Natural Language Processing
+@SN :   23043574
+@Contact :   uceewl4@ucl.ac.uk
+@Desc    :   This file is used for encapsulated all related methods and attributes for ensemble learning
+for emotion classification.
 """
+
+# here put the import lib
 
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
@@ -36,9 +41,6 @@ class Ensemble(nn.Module):
         self.method = method
         self.device = device
         self.multilabel = multilabel
-        # self.model = AutoModelForSequenceClassification.from_pretrained(
-        #     "bert-base-uncased", num_labels=4
-        # )  # 4 class
         self.pretrained = Pretrained(method=method, device=device, lr=lr, epochs=epochs)
         self.rnn = RNN(
             method=method,
@@ -47,17 +49,25 @@ class Ensemble(nn.Module):
             output_dim=output_dim,
             bidirectional=bidirectional,
         )
-        self.num_class = 8
+        self.num_class = 8  # 8 class classification problem
         self.lr = lr
         self.epochs = epochs
         self.alpha = alpha
         self.loss_fn = torch.nn.CrossEntropyLoss()
 
     def train(self, model, train_dataloader, val_dataloader):
+        """
+        description: This is the method for training and validation process.
+        param {*} self
+        param {*} model
+        param {*} train_dataloader
+        param {*} val_dataloader
+        return {*}: results for training and validation
+        """
         self.optimizer = Adam(model.parameters(), lr=self.lr)
         model.to(self.device)
+
         print("Start training......")
-        # model.train()
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
 
@@ -65,7 +75,8 @@ class Ensemble(nn.Module):
             progress_bar = tqdm(range(len(train_dataloader)))
             train_losses, train_pred, train_labels = [], [], []
             for step, train_batch in enumerate(train_dataloader):
-                train_input_ids = train_batch[0].to(self.device)  # id tokens
+                # input
+                train_input_ids = train_batch[0].to(self.device)
                 train_attention_mask = train_batch[1].to(self.device)
                 train_label = (
                     F.one_hot(train_batch[2], num_classes=self.num_class)
@@ -73,32 +84,30 @@ class Ensemble(nn.Module):
                     .to(self.device)
                 )  # (8,8)
 
-                self.optimizer.zero_grad()  # Zero the gradients
+                self.optimizer.zero_grad()  # empty the gradients
                 pretrained_train_output = self.pretrained.model(
                     train_input_ids,
                     attention_mask=train_attention_mask,
                     labels=train_label,
                 )
                 rnn_train_output = self.rnn(train_input_ids)
-
-                # pretrained_train_prob = torch.nn.functional.log_softmax(pretrained_train_output.logits)  # from logits to log softmax
                 pretrained_train_logits = pretrained_train_output.logits
                 total_train_prob = (
                     self.alpha * pretrained_train_logits
                     + (1 - self.alpha) * rnn_train_output
                 )
                 total_train_loss = self.loss_fn(total_train_prob, train_label)
-
-                total_train_loss.backward()  # Compute the gradient of the loss
-                self.optimizer.step()  # Update model parameters
+                total_train_loss.backward()  # backward propagation
+                self.optimizer.step()
                 progress_bar.update(1)
                 train_losses.append(total_train_loss.item())
 
+                # get prediction
                 if self.multilabel == False:
                     train_pred += torch.argmax(
                         total_train_prob, dim=-1
                     ).tolist()  # from logits argmax
-                elif self.multilabel == True:
+                elif self.multilabel == True:  # top-3 multilabel
                     top_values, top_indices = torch.topk(total_train_prob, 3, dim=1)
                     for index, i in enumerate(train_batch[2].tolist()):
                         if i in top_indices[index]:
@@ -124,22 +133,23 @@ class Ensemble(nn.Module):
                 f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}"
             )
 
+            # validation for selecting best weights
             min_average_loss = float("inf")
             val_min_pred, val_min_labels = [], []
             progress_bar_val = tqdm(range(4 * len(val_dataloader)))
+
+            # for each weight
             for alpha in np.arange(0.1, 1, 0.25):
-                # self.model.to(device)
                 val_pred, val_labels = [], []
                 for val_batch in val_dataloader:
                     val_losses = []
-                    # Move batch data to the same device as the model
-                    val_input_ids = val_batch[0].to(self.device)  # id tokens
+                    val_input_ids = val_batch[0].to(self.device)
                     val_attention_mask = val_batch[1].to(self.device)
                     val_label = (
                         F.one_hot(val_batch[2], num_classes=self.num_class)
                         .type(torch.float)
                         .to(self.device)
-                    )  # (8,20)
+                    )
 
                     self.optimizer.zero_grad()
                     pretrained_val_output = self.pretrained.model(
@@ -148,16 +158,16 @@ class Ensemble(nn.Module):
                         labels=val_label,
                     )
                     rnn_val_output = self.rnn(val_input_ids)
-
-                    # pretrained_train_prob = torch.nn.functional.log_softmax(pretrained_train_output.logits)  # from logits to log softmax
                     pretrained_val_logits = pretrained_val_output.logits
                     total_val_prob = (
                         alpha * pretrained_val_logits + (1 - alpha) * rnn_val_output[0]
                     )
                     total_val_loss = self.loss_fn(total_val_prob, val_label)
                     total_val_loss.backward()
-                    self.optimizer.step()  # Update model parameters
+                    self.optimizer.step()
                     progress_bar_val.update(1)
+
+                    # get prediction
                     if self.multilabel == False:
                         val_pred += torch.argmax(
                             total_val_prob, dim=-1
@@ -212,16 +222,20 @@ class Ensemble(nn.Module):
         )
 
     def test(self, model, test_dataloader):
+        """
+        description: This is the testing process for the methods
+        param {*} self
+        param {*} model
+        param {*} test_dataloader
+        return {*}: test results
+        """
         print("Start testing......")
-        # model.eval()
-        # self.model.to(device)
         test_losses, test_pred, test_labels = [], [], []
         progress_bar_test = tqdm(range(len(test_dataloader)))
 
         with torch.no_grad():
             for test_batch in test_dataloader:
-                # Move batch data to the same device as the model
-                test_input_ids = test_batch[0].to(self.device)  # id tokens
+                test_input_ids = test_batch[0].to(self.device)
                 test_attention_mask = test_batch[1].to(self.device)
                 test_label = (
                     F.one_hot(test_batch[2], num_classes=self.num_class)
@@ -235,8 +249,6 @@ class Ensemble(nn.Module):
                     labels=test_label,
                 )
                 rnn_test_output = self.rnn(test_input_ids)
-
-                # pretrained_train_prob = torch.nn.functional.log_softmax(pretrained_train_output.logits)  # from logits to log softmax
                 pretrained_test_logits = pretrained_test_output.logits
                 total_test_prob = (
                     self.alpha * pretrained_test_logits
@@ -244,6 +256,8 @@ class Ensemble(nn.Module):
                 )
                 total_test_loss = self.loss_fn(total_test_prob, test_label)
                 progress_bar_test.update(1)
+
+                # get prediction
                 if self.multilabel == False:
                     test_pred += torch.argmax(
                         total_test_prob, dim=-1
@@ -259,6 +273,7 @@ class Ensemble(nn.Module):
                             )
                 test_labels += test_batch[2].tolist()
                 test_losses.append(total_test_loss.item())
+
             test_pred = np.array(test_pred)
             print(f"\nFinish testing. Test loss: {np.array(test_losses).mean()}")
 

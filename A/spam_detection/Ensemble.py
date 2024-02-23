@@ -1,16 +1,21 @@
+# -*- encoding: utf-8 -*-
 """
-Author: uceewl4 uceewl4@ucl.ac.uk
-Date: 2024-02-08 21:17:17
-LastEditors: uceewl4 uceewl4@ucl.ac.uk
-LastEditTime: 2024-02-08 21:26:11
-FilePath: /DLNLP_assignment23_24-SN23043574/A/sentiment_analysis/Pretrained.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+@File    :   Ensemble.py
+@Time    :   2024/02/23 18:37:20
+@Programme :  MSc Integrated Machine Learning Systems (TMSIMLSSYS01)
+@Module : ELEC0141: Deep Learning for Natural Language Processing
+@SN :   23043574
+@Contact :   uceewl4@ucl.ac.uk
+@Desc    :   This file is used for encapsulated all related methods and attributes for ensemble learning
+for spam detection.
 """
+
+# here put the import lib
+
 
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
 import torch.nn.functional as F
-from sklearn.metrics import accuracy_score
 from torch.nn import CrossEntropyLoss
 from transformers import (
     AutoModelForSequenceClassification,
@@ -40,9 +45,6 @@ class Ensemble(nn.Module):
         super(Ensemble, self).__init__()
         self.method = method
         self.device = device
-        # self.model = AutoModelForSequenceClassification.from_pretrained(
-        #     "bert-base-uncased", num_labels=4
-        # )  # 4 class
         self.pretrained = Pretrained(method=method, device=device, lr=lr, epochs=epochs)
         self.rnn = RNN(
             method=method,
@@ -58,10 +60,18 @@ class Ensemble(nn.Module):
         self.loss_fn = torch.nn.CrossEntropyLoss()
 
     def train(self, model, train_dataloader, val_dataloader):
+        """
+        description: This is the method for training and validation process.
+        param {*} self
+        param {*} model
+        param {*} train_dataloader
+        param {*} val_dataloader
+        return {*}: results for training and validation
+        """
         self.optimizer = Adam(model.parameters(), lr=self.lr)
         model.to(self.device)
         print("Start training......")
-        # model.train()
+
         train_epoch_losses, train_epoch_accs = [], []
         val_epoch_losses, val_epoch_accs = [], []
 
@@ -75,33 +85,32 @@ class Ensemble(nn.Module):
                     F.one_hot(train_batch[2], num_classes=self.num_class)
                     .type(torch.float)
                     .to(self.device)
-                )  # (8,8)
+                )
 
-                self.optimizer.zero_grad()  # Zero the gradients
+                self.optimizer.zero_grad()
                 pretrained_train_output = self.pretrained.model(
                     train_input_ids,
                     attention_mask=train_attention_mask,
                     labels=train_label,
                 )
                 rnn_train_output = self.rnn(train_input_ids)
-
-                # pretrained_train_prob = torch.nn.functional.log_softmax(pretrained_train_output.logits)  # from logits to log softmax
                 pretrained_train_logits = pretrained_train_output.logits
                 total_train_prob = (
                     self.alpha * pretrained_train_logits
                     + (1 - self.alpha) * rnn_train_output
                 )
                 total_train_loss = self.loss_fn(total_train_prob, train_label)
-
-                total_train_loss.backward()  # Compute the gradient of the loss
-                self.optimizer.step()  # Update model parameters
+                total_train_loss.backward()
+                self.optimizer.step()
                 progress_bar.update(1)
                 train_losses.append(total_train_loss.item())
 
+                # get predictions
                 train_pred += torch.argmax(
                     total_train_prob, dim=-1
                 ).tolist()  # from logits argmax
                 train_labels += train_batch[2].tolist()
+
             train_pred = np.array(train_pred)
             train_epoch_loss = np.mean(train_losses)
             train_epoch_losses.append(train_epoch_loss)
@@ -117,15 +126,15 @@ class Ensemble(nn.Module):
                 f"\nEpoch {epoch} complete, train loss: {round(train_epoch_loss,4)}, acc: {train_epoch_acc}"
             )
 
+            # validation for selecting best weights
             min_average_loss = float("inf")
             val_min_pred, val_min_labels = [], []
             progress_bar_val = tqdm(range(4 * len(val_dataloader)))
+
             for alpha in np.arange(0.1, 1, 0.25):
-                # self.model.to(device)
                 val_pred, val_labels = [], []
                 for val_batch in val_dataloader:
                     val_losses = []
-                    # Move batch data to the same device as the model
                     val_input_ids = val_batch[0].to(self.device)  # id tokens
                     val_attention_mask = val_batch[1].to(self.device)
                     val_label = (
@@ -141,8 +150,6 @@ class Ensemble(nn.Module):
                         labels=val_label,
                     )
                     rnn_val_output = self.rnn(val_input_ids)
-
-                    # pretrained_train_prob = torch.nn.functional.log_softmax(pretrained_train_output.logits)  # from logits to log softmax
                     pretrained_val_logits = pretrained_val_output.logits
                     total_val_prob = (
                         alpha * pretrained_val_logits + (1 - alpha) * rnn_val_output[0]
@@ -152,10 +159,10 @@ class Ensemble(nn.Module):
                     self.optimizer.step()  # Update model parameters
                     progress_bar_val.update(1)
 
+                    # prediction
                     val_pred += torch.argmax(
                         total_val_prob, dim=-1
                     ).tolist()  # from logits argmax
-
                     val_labels += val_batch[2].tolist()
                     val_losses.append(total_val_loss.item())
 
@@ -168,6 +175,7 @@ class Ensemble(nn.Module):
                     * 100,
                     4,
                 )
+
                 if val_epoch_loss <= min_average_loss:
                     self.alpha = alpha
                     print(
@@ -196,15 +204,20 @@ class Ensemble(nn.Module):
         )
 
     def test(self, model, test_dataloader):
+        """
+        description: This is the testing process for the methods
+        param {*} self
+        param {*} model
+        param {*} test_dataloader
+        return {*}: test results
+        """
         print("Start testing......")
-        # model.eval()
-        # self.model.to(device)
+
         test_losses, test_pred, test_labels = [], [], []
         progress_bar_test = tqdm(range(len(test_dataloader)))
 
         with torch.no_grad():
             for test_batch in test_dataloader:
-                # Move batch data to the same device as the model
                 test_input_ids = test_batch[0].to(self.device)  # id tokens
                 test_attention_mask = test_batch[1].to(self.device)
                 test_label = (
@@ -219,8 +232,6 @@ class Ensemble(nn.Module):
                     labels=test_label,
                 )
                 rnn_test_output = self.rnn(test_input_ids)
-
-                # pretrained_train_prob = torch.nn.functional.log_softmax(pretrained_train_output.logits)  # from logits to log softmax
                 pretrained_test_logits = pretrained_test_output.logits
                 total_test_prob = (
                     self.alpha * pretrained_test_logits
@@ -229,12 +240,13 @@ class Ensemble(nn.Module):
                 total_test_loss = self.loss_fn(total_test_prob, test_label)
                 progress_bar_test.update(1)
 
+                # get prediction
                 test_pred += torch.argmax(
                     total_test_prob, dim=-1
                 ).tolist()  # from logits argmax
-
                 test_labels += test_batch[2].tolist()
                 test_losses.append(total_test_loss.item())
+
             test_pred = np.array(test_pred)
             print(f"\nFinish testing. Test loss: {np.array(test_losses).mean()}")
 
