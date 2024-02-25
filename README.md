@@ -6,7 +6,7 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
 **Module**: ELEC0141: Deep Learning for Natural Language Processing \
 **Project name:** DLNLP final assignment \
 **Scope:** Deep Learning, Natural Language Processing, Research, Simulation \
-**Github:** https://github.com/uceewl4/DLNLP_assignment23_24-SN23043574.git (The private respository will become public once the deadline is passed. You can also download the project through Google Drive link provided in the report. And please see the video demonstration in Google drive as well. It has to be emphasized that the project is majorly run on UCL GPU server and Google Colab. It can be run on CPU of your PC, but it will be much slower. Hence, it's recommended to watch my video or to run my project on GPU server. You can also test the running on CPU with small epochs. Please follow the guidelines in Requirement and Usage to run the project. Thanks a lot.)
+**Github:** https://github.com/uceewl4/DLNLP_assignment23_24-SN23043574.git (The private respository will become public once the deadline is passed. You can also download the project through Google Drive link provided in the report. And please see the video demonstration in Google drive as well. It has to be emphasized that the project is majorly run on UCL GPU server and Google Colab. It can be run on CPU of your PC, but it will be much slower. Hence, it's recommended to watch my video. You can also test the running on CPU with small epochs. Please follow the guidelines in Requirement and Usage to run the project. Thanks a lot.)
 
 ## Description
 ### 1. Project Structure 
@@ -154,7 +154,7 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
   It's also ok for you to combine step 1 and 2 together to run:
     <p><code>conda env create -f environment.yml</code></p>
   The result will be the same for each method.
-- Step 3: You can choose corresponding task and method with different argument settings.  **<font color=red> However, due to the capacity of CPU, some model may be extremely slow to run. It's better if you can run it on UCL GPU server (you can also find my correpsonding folder in /scratch/uceewl4/DLNLP_assignment23_24-SN23043574). Also, some pretrained model in task B is run on Google Colab. If you want to check the model implementation on CPU, try some fast model to see their performance as recommended:</font>**
+- Step 3: You can choose corresponding task and method with different argument settings.  **<font color=red> However, due to the capacity of CPU, some model may be extremely slow to run. Nearly all implementation process is run on UCL GPU server (you can also find my correpsonding folder in /scratch/uceewl4/DLNLP_assignment23_24-SN23043574 and feel free to run it with the conda environment name DLNLP). Also, some pretrained model in task B is run on Google Colab. If you want to check the model implementation on CPU, try some fast model to see their performance as recommended:</font>**
 
         methods of task A: TextCNN, RNN, etc. (You can try it on GPU or set a small epoch on CPU to see the performance. Pretrained and Ensemble will be extremely slow.)
         task B: NER (Not recommended to try others on CPU, where MT and QA can be extreme slower.)
