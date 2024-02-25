@@ -147,7 +147,7 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
   - System deisgn: Streamlit package in Python (https://docs.streamlit.io/)
   - Notice that functions of co-reference resolution and dependency parsing are realized but cannot be presented by this system because of conflict version between space-transformers and transformers. Besides, some system functions like *Help* need to ensure internet connection for email.
 
-## Usage
+## Usage: please follow the video in Google Drive link
 - Step 1: Create environment with corresponding version mentioned in **Requirements** with Anaconda Navigator.
 - Step 2: Install requirement packages for the environment: 
   <p><code>pip install -r requirements.txt</code></p>
@@ -191,7 +191,7 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
 - To run DDI system:
   <p><code>streamlit run interface.py</code></p>
 
-  **<font color=red>The system can only be run with all preprocessed dataset and environment requirement already prepared. To emphasize, it's a separate file from main.py and can only be run on CPU with the command above.</font>**
+  **<font color=red>The system can only be run with all preprocessed dataset and environment requirement already prepared. To emphasize, it's a separate file from main.py and can only be run on CPU with the command above. Besides, the functions of co-reference resolution and dependency parsing cannot be run on CPU due to version compatibility.</font>**
 
   To upload image for *image-to-text section*, you can select a .JPG image respectively.
 

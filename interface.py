@@ -258,7 +258,7 @@ elif choose == "Sentiment&Intent":
             )
             res = intent_task(input)[0]["label"]
         if input != "":
-            st.success(f"Your sentiment is {res}")
+            st.success(f"Your intent is {res}")
 
 # sentence analysis
 elif choose == "Sentence analysis":
