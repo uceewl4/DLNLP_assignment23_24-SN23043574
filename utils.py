@@ -190,6 +190,7 @@ def load_data(task, method, batch_size=8, type="train", grained="coarse"):
         # vocab = tokenizer.get_vocab()
 
     elif method in ["LSTM"]:
+        spacy.cli.download("en_core_web_md")
         nlp_md = spacy.load("en_core_web_md")
         vocab = nlp_md.vocab
         sentences = nlp_md.pipe(

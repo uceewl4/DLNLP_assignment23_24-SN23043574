@@ -1,7 +1,8 @@
 import re
 from transformers import pipeline
 from spacy_streamlit import visualize_spans
-import spacy_transformers
+
+# import spacy_transformers
 import nltk
 import transformers
 from sentence_transformers import SentenceTransformer, util
@@ -22,7 +23,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
 import spacy
-import spacy_experimental
+
+# import spacy_experimental
 import os
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Config

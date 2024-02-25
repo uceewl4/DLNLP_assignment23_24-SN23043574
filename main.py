@@ -63,7 +63,7 @@ if __name__ == "__main__":
         help="selected from 5 basic tasks: sentiment_analysis, emotion_classification, \
             spam_detection, fake_news, intent_recognition.",
     )
-    parser.add_argument("--method", type=str, default="RNN", help="model chosen")
+    parser.add_argument("--method", type=str, default="TextCNN", help="model chosen")
     parser.add_argument(
         "--batch_size", type=int, default=8, help="batch size of different methods"
     )
@@ -108,12 +108,6 @@ if __name__ == "__main__":
         type=int,
         default=0.5,
         help="initialization for ensemble weight",
-    )
-    parser.add_argument(
-        "--download",
-        type=bool,
-        default=True,
-        help="whether download 'en_core_web_md' for LSTM, notice that only used of first time",
     )
     args = parser.parse_args()
     task = args.task
@@ -184,8 +178,6 @@ if __name__ == "__main__":
                 grained=args.grained,
             )
         elif method in ["LSTM"]:
-            if args.download:
-                spacy.cli.download("en_core_web_md")
             train_dataloader, vocab, embeddings = load_data(
                 task,
                 method,
