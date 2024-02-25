@@ -160,6 +160,7 @@ This is the final assignment for 23/24 DLNLP ELEC0141 Msc IMLS SN23043574. Notic
         task B: NER (Not recommended to try others on CPU, where MT and QA can be extreme slower.)
 
   <p><code>python main.py</code></p>
+  <p><code>python main.py --multilabel True</code></p>
   <p><code>python main.py --method RNN --task sentiment_analysis --epochs 1</code></p>
   <p><code>python main.py --task NER --epochs 1</code></p>
 
